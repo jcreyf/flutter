@@ -1,0 +1,37 @@
+name: mediatheque
+description: "Media Player"
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+version: 0.0.1+1
+
+environment:
+  sdk: '>=3.2.3 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^2.0.0
+
+  # Package to set your own app icon:
+  #   https://pub.dev/packages/flutter_launcher_icons/versions
+  #   https://www.flutterbeads.com/change-app-launcher-icon-flutter/
+  #   https://icon.kitchen/
+  #   /> flutter pub run flutter_launcher_icons
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  min_sdk_android: 22
+  ios: true
+  image_path: "assets/icons/app_icon_512x512.png"
+  adaptive_icon_background: "#584B58"
+  adaptive_icon_foreground: "assets/icons/app_icon_512x512.png"
+
+flutter:
+  uses-material-design: true
