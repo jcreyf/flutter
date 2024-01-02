@@ -7,6 +7,10 @@ class MediaFile {
   int _lengthInSeconds = 0;
   int _lastListenedSecond = 0;
 
+  MediaFile({required String filename}) {
+    _fileName = filename;
+  }
+
   @override
   String toString() {
     return '$_fileName ($_lengthInSeconds seconds)';

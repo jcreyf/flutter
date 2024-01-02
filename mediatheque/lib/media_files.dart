@@ -1,5 +1,6 @@
-import 'dart:io' as io;
-import 'package:path/path.dart';
+import 'dart:io';
+import 'dart:async';
+//import 'package:path/path.dart';
 import 'package:mediatheque/media_file.dart';
 
 class MediaFiles {
@@ -10,17 +11,25 @@ class MediaFiles {
     return _mediaFiles;
   }
 
-//  void buildList({required String directory}) async {
-  Future<List> buildList({required String directory}) async {
-    io.Directory dir = io.Directory.fromUri(Uri(path: directory));
+  Future<List<MediaFile>> buildList({required String directory, required Function callback}) async {
+    Directory dir = Directory.fromUri(Uri(path: directory));
+    var completer = Completer<List<MediaFile>>();
+    _mediaFiles.clear();
+
     print("List files in: ${dir.path}");
-//    List<String> bestanden=<String>[];
-//    await for (final entity in dir.list()) {
-//      print("file: ${entity.path}");
-//      bestanden.add(entity.path);
-//    }
-    Future<List<String>> bestanden =
-        dir.list().map((event) => event.path).toList();
-    return bestanden;
+
+    var lister = dir.list(recursive: true);
+    lister.listen((file) {
+      if (file is File) {
+        _mediaFiles.add(MediaFile(filename: file.path));
+      }
+    },
+        // should also register onError
+        onDone: () {
+      completer.complete(_mediaFiles);
+      callback();
+    });
+
+    return completer.future;
   }
 }
