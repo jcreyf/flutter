@@ -1,4 +1,6 @@
 /*
+  flutter build apk --release
+
   adb devices
   adb connect emulator-5554
   adb push ~/data/tmp/muziek 
@@ -6,48 +8,84 @@
 */
 
 import 'dart:io';
-import 'package:external_path/external_path.dart';
+import 'package:mediatheque/mediatheque_setting.dart';
 import 'package:mediatheque/media_files.dart';
 import 'package:mediatheque/media_file.dart';
 import 'package:flutter/material.dart';
+import 'package:external_path/external_path.dart';
 // https://pub.dev/packages/permission_handler
 // https://github.com/baseflow/flutter-permission-handler
 //   /> flutter pub add permission_handler
 import 'package:permission_handler/permission_handler.dart';
+// Used to dynamically restart the app:
+//   https://pub.dev/packages/flutter_phoenix
+//   /> flutter pub add flutter_phoenix
+import 'package:flutter_phoenix/flutter_phoenix.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(
+      // Wrapping the app in a Phoenix widget that we can use to hot restart when needed.
+      // (the Phoenix widget basically generates a new 'key' on itself, invalidating the
+      // UI and regenerating everything)
+      Phoenix(
+    child: MediathequeApp(),
+  ));
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+//-------------
 
-  // This widget is the root of your application.
+class Menu {
+  static const String Theme = 'Theme';
+  static const String Refresh = 'Refresh';
+  static const String Exit = 'Exit';
+  static const List<String> menuItems = <String>[Theme, Refresh, Exit];
+}
+
+//-------------
+
+class MediathequeApp extends StatelessWidget {
+  final title = "Mediatheque";
+
+  /// Constructor
+  MediathequeApp() {
+    super.key;
+  }
+
+  /// This widget is the root of the application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Mediatheque',
+      title: title,
+      themeMode: ApplicationSetting.systemTheme ? ThemeMode.system : (ApplicationSetting.darkTheme ? ThemeMode.dark : ThemeMode.light),
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Media Player'),
+      home: MediathequeHomePage(title: title),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+//-------------
+
+class MediathequeHomePage extends StatefulWidget {
+  const MediathequeHomePage({super.key, required this.title});
   final String title;
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<MediathequeHomePage> createState() => _MediathequeHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  String dir = "";
-  int _counter = 0;
+//-------------
+
+class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerProviderStateMixin {
+  final settingsDatabase = SettingsDatabase();
   MediaFiles _mediaFiles = MediaFiles();
+  late TabController tabController;
+  List<String> tabNames = ["Media", "Map"];
+  int currentTab = 0;
+  String statusText = "No Files...";
+  String dir = "";
 
   @override
   void initState() {
@@ -55,6 +93,37 @@ class _MyHomePageState extends State<MyHomePage> {
 
     checkPermission();
     getPublicDirectoryPath();
+  }
+
+  @override
+  void dispose() {
+    tabController.dispose();
+    super.dispose();
+  }
+
+  void loadSettings() {
+    setState(() {
+      settingsDatabase.fetchAll().then((settings) {
+        for (var setting in settings) {
+          switch (setting.type) {
+            // Process app settings:
+            case "setting":
+              switch (setting.key) {
+                // Process display theme setting:
+                case "theme":
+                  setTheme(themeName: setting.value);
+                  break;
+                // Process default tab setting:
+                case "default_tab":
+                  ApplicationSetting.defaultTab = setting.value;
+                  statusText += "\nSelect tab: ${ApplicationSetting.defaultTab}";
+                  break;
+              }
+              break;
+          }
+        }
+      });
+    });
   }
 
 //   /// Get storage directory paths
@@ -93,7 +162,7 @@ class _MyHomePageState extends State<MyHomePage> {
       // Since Android 13:
       var status = await Permission.manageExternalStorage.request();
       if (status.isGranted) {
-        print('Filesystem access permission is granted');
+        statusText = 'Filesystem access permission is granted';
       } else if (status.isPermanentlyDenied) {
         // We don't have permission.  Open the settings page so the user can decide to allow it:
         openAppSettings();
@@ -103,7 +172,7 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  void _incrementCounter() async {
+  void refreshList() async {
     getPublicDirectoryPath();
 
     List<MediaFile> files = await _mediaFiles.buildList(
@@ -111,24 +180,126 @@ class _MyHomePageState extends State<MyHomePage> {
         callback: (() {
           setState(() {
             // Update the UI
-            print("UPDATE UI");
+            statusText = "UPDATE UI";
           });
         }));
     for (final file in files) {
       print("media file: ${file.baseFileName}");
     }
+  }
 
+  void menuAction(String menuItem) {
+    print("Menu: $menuItem");
     setState(() {
-      _counter++;
+      switch (menuItem) {
+        case (Menu.Theme):
+          menuTheme();
+          break;
+        case (Menu.Refresh):
+          refreshList();
+          break;
+        case (Menu.Exit):
+          exit(0);
+          break;
+      }
     });
+  }
+
+  void menuTheme() {
+    // Toggle through the themes:
+    String theme;
+    if (ApplicationSetting.systemTheme) {
+      ApplicationSetting.systemTheme = false;
+      ApplicationSetting.darkTheme = true;
+      theme = "dark";
+    } else if (ApplicationSetting.darkTheme) {
+      ApplicationSetting.systemTheme = false;
+      ApplicationSetting.darkTheme = false;
+      theme = "light";
+    } else {
+      ApplicationSetting.systemTheme = true;
+      ApplicationSetting.darkTheme = false;
+      theme = "system";
+    }
+    statusText = "Switching to $theme theme";
+    settingsDatabase.update(type: "setting", key: "theme", value: theme);
+    // The theme is set all the way in the beginning of the app.  Restart the app:
+    Phoenix.rebirth(context);
+  }
+
+  void setTheme({required String themeName}) {
+    switch (themeName) {
+      case "system":
+        ApplicationSetting.systemTheme = true;
+        ApplicationSetting.darkTheme = false;
+        statusText = "Theme: system";
+        break;
+      case "dark":
+        ApplicationSetting.systemTheme = false;
+        ApplicationSetting.darkTheme = true;
+        statusText = "Theme: dark";
+        break;
+      case "light":
+        ApplicationSetting.systemTheme = false;
+        ApplicationSetting.darkTheme = false;
+        statusText = "Theme: light";
+        break;
+    }
+  }
+
+  void onTabChange() {
+    if (!tabController.indexIsChanging) {
+      currentTab = tabController.index;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // We need our own custom tab controller to keep track of which tab is active:
+    tabController = TabController(length: tabNames.length, vsync: this, initialIndex: currentTab);
+    tabController.addListener(onTabChange);
+
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
+        foregroundColor: Colors.yellow,
+        backgroundColor: Colors.green[900],
+        bottom: TabBar(
+          controller: tabController,
+          indicatorSize: TabBarIndicatorSize.tab,
+          indicator: BoxDecoration(
+            borderRadius: BorderRadius.circular(5),
+            gradient: const LinearGradient(
+              colors: [Colors.yellow, Colors.amberAccent],
+            ),
+          ),
+          unselectedLabelColor: Colors.grey,
+          tabs: <Widget>[
+            for (var tabName in tabNames)
+              Tab(
+                text: tabName,
+              )
+          ],
+        ),
+        actions: <Widget>[
+          IconButton(icon: Icon(Icons.refresh), onPressed: () => refreshList()),
+          PopupMenuButton<String>(
+            onSelected: menuAction,
+            itemBuilder: (BuildContext context) {
+              return Menu.menuItems.map((String menuItem) {
+                return PopupMenuItem<String>(
+                  value: menuItem,
+                  child: Row(
+                    children: [
+                      Text(menuItem),
+                      Icon(Icons.edit),
+                    ],
+                  ),
+                );
+              }).toList();
+            },
+          )
+        ],
       ),
       body: _mediaFiles.files.isNotEmpty
           ? ListView.builder(
@@ -152,10 +323,9 @@ class _MyHomePageState extends State<MyHomePage> {
               },
             )
           : const Center(child: Text('No Files')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+      bottomNavigationBar: Container(
+        color: Colors.green[900],
+        child: Text(statusText, style: TextStyle(color: Colors.yellow)),
       ),
     );
   }
