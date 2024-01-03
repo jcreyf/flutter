@@ -8,11 +8,12 @@
 */
 
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:mediatheque/mediatheque_setting.dart';
 import 'package:mediatheque/media_files.dart';
 import 'package:mediatheque/media_file.dart';
-import 'package:flutter/material.dart';
 import 'package:external_path/external_path.dart';
+import 'package:path/path.dart';
 // https://pub.dev/packages/permission_handler
 // https://github.com/baseflow/flutter-permission-handler
 //   /> flutter pub add permission_handler
@@ -35,10 +36,11 @@ void main() {
 //-------------
 
 class Menu {
-  static const String Theme = 'Theme';
-  static const String Refresh = 'Refresh';
+  static const String SetDirectory = 'Change directory';
+  static const String ChangeTheme = 'Toggle Theme';
+  static const String Refresh = 'Refresh files';
   static const String Exit = 'Exit';
-  static const List<String> menuItems = <String>[Theme, Refresh, Exit];
+  static const List<String> menuItems = <String>[SetDirectory, ChangeTheme, Refresh, Exit];
 }
 
 //-------------
@@ -61,7 +63,7 @@ class MediathequeApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: MediathequeHomePage(title: title),
+      home: MediathequeHomePage(title: title, context: context),
     );
   }
 }
@@ -69,8 +71,9 @@ class MediathequeApp extends StatelessWidget {
 //-------------
 
 class MediathequeHomePage extends StatefulWidget {
-  const MediathequeHomePage({super.key, required this.title});
+  const MediathequeHomePage({super.key, required this.title, required this.context});
   final String title;
+  final BuildContext context;
 
   @override
   State<MediathequeHomePage> createState() => _MediathequeHomePageState();
@@ -82,17 +85,17 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
   final settingsDatabase = SettingsDatabase();
   MediaFiles _mediaFiles = MediaFiles();
   late TabController tabController;
-  List<String> tabNames = ["Media", "Map"];
+  List<String> tabNames = ["Media", "Logs"];
   int currentTab = 0;
   String statusText = "No Files...";
-  String dir = "";
+  String mediaDirectory = "";
 
   @override
   void initState() {
     super.initState();
 
     checkPermission();
-    getPublicDirectoryPath();
+    loadSettings();
   }
 
   @override
@@ -109,6 +112,9 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
             // Process app settings:
             case "setting":
               switch (setting.key) {
+                // Process media directory path:
+                case "media_directory":
+                  mediaDirectory = setting.value;
                 // Process display theme setting:
                 case "theme":
                   setTheme(themeName: setting.value);
@@ -122,6 +128,13 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
               break;
           }
         }
+        // Set the default directory if not found in the settings:
+        if (mediaDirectory.isEmpty) {
+//          getPublicDirectoryPath();
+          mediaDirectory = "/storage/emulated/0/Documents";
+        }
+        // Get a file listing and update the UI:
+        refreshList();
       });
     });
   }
@@ -140,8 +153,8 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
   // To get public storage directory path like Downloads, Picture, Movie etc.
   // Use below code
   Future<void> getPublicDirectoryPath() async {
-    dir = await ExternalPath.getExternalStoragePublicDirectory(ExternalPath.DIRECTORY_DOWNLOADS);
-    print("Downloads directory: $dir");
+    mediaDirectory = await ExternalPath.getExternalStoragePublicDirectory(ExternalPath.DIRECTORY_DOWNLOADS);
+    print("Downloads directory: $mediaDirectory");
   }
 
   /// Check if we have the permission to access the filesystem.
@@ -172,11 +185,10 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
     }
   }
 
+  /// Update the list of supported media files
   void refreshList() async {
-    getPublicDirectoryPath();
-
     List<MediaFile> files = await _mediaFiles.buildList(
-        directory: dir,
+        directory: mediaDirectory,
         callback: (() {
           setState(() {
             // Update the UI
@@ -190,67 +202,112 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
 
   void menuAction(String menuItem) {
     print("Menu: $menuItem");
-    setState(() {
-      switch (menuItem) {
-        case (Menu.Theme):
-          menuTheme();
-          break;
-        case (Menu.Refresh):
-          refreshList();
-          break;
-        case (Menu.Exit):
-          exit(0);
-          break;
-      }
-    });
+    switch (menuItem) {
+      case (Menu.SetDirectory):
+        selectDirectory(((newDirName) {
+          setState(() {
+            mediaDirectory = newDirName;
+            statusText = "New dir: $newDirName";
+            print("Dir: $mediaDirectory");
+          });
+        }));
+        break;
+      case (Menu.ChangeTheme):
+        changeTheme();
+        break;
+      case (Menu.Refresh):
+        refreshList();
+        break;
+      case (Menu.Exit):
+        exit(0);
+    }
   }
 
-  void menuTheme() {
-    // Toggle through the themes:
+  /// Toggle through the themes.
+  /// This sets the new theme and basically invalidates the app, forcing it to restart.
+  void changeTheme() {
     String theme;
     if (ApplicationSetting.systemTheme) {
-      ApplicationSetting.systemTheme = false;
-      ApplicationSetting.darkTheme = true;
       theme = "dark";
     } else if (ApplicationSetting.darkTheme) {
-      ApplicationSetting.systemTheme = false;
-      ApplicationSetting.darkTheme = false;
       theme = "light";
     } else {
-      ApplicationSetting.systemTheme = true;
-      ApplicationSetting.darkTheme = false;
       theme = "system";
     }
-    statusText = "Switching to $theme theme";
-    settingsDatabase.update(type: "setting", key: "theme", value: theme);
+    setTheme(themeName: theme);
     // The theme is set all the way in the beginning of the app.  Restart the app:
-    Phoenix.rebirth(context);
+    Phoenix.rebirth(this.context);
   }
 
+  /// Set the application's theme
   void setTheme({required String themeName}) {
     switch (themeName) {
       case "system":
         ApplicationSetting.systemTheme = true;
         ApplicationSetting.darkTheme = false;
-        statusText = "Theme: system";
         break;
       case "dark":
         ApplicationSetting.systemTheme = false;
         ApplicationSetting.darkTheme = true;
-        statusText = "Theme: dark";
         break;
       case "light":
         ApplicationSetting.systemTheme = false;
         ApplicationSetting.darkTheme = false;
-        statusText = "Theme: light";
         break;
     }
+    statusText = "Switching to $themeName theme";
+    settingsDatabase.update(type: "setting", key: "theme", value: themeName);
   }
 
   void onTabChange() {
     if (!tabController.indexIsChanging) {
       currentTab = tabController.index;
     }
+  }
+
+  void selectDirectory(Function callback) {
+    final dirController = TextEditingController(text: mediaDirectory);
+
+    showDialog(
+        context: this.context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Media Directory'),
+            content: SingleChildScrollView(
+                child: ListBody(
+              children: <Widget>[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    const Text('Name:'),
+                    SizedBox(
+                      width: 220,
+                      child: TextField(
+                        controller: dirController,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            )),
+            actions: [
+              TextButton(
+                child: const Text('Cancel'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+              TextButton(
+                child: const Text('Save'),
+                onPressed: () {
+                  callback(dirController.text);
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          );
+        });
   }
 
   @override
@@ -317,7 +374,9 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
                             style: TextStyle(fontSize: 18),
                           ))),
                   onTap: () {
-                    print("click $song");
+                    setState(() {
+                      statusText = "click $song";
+                    });
                   },
                 );
               },

@@ -2,10 +2,11 @@ import 'dart:io';
 import 'dart:async';
 //import 'package:path/path.dart';
 import 'package:mediatheque/media_file.dart';
+import 'package:path/path.dart';
 
 class MediaFiles {
   List<MediaFile> _mediaFiles = [];
-  static final List<String> supportedExtensions = ["mp3", "wmv"];
+  static final List<String> supportedExtensions = [".mp3", ".wmv"];
 
   List<MediaFile> get files {
     return _mediaFiles;
@@ -21,12 +22,18 @@ class MediaFiles {
     var lister = dir.list(recursive: true);
     lister.listen((file) {
       if (file is File) {
-        _mediaFiles.add(MediaFile(filename: file.path));
+        // Only use supported files:
+        if (supportedExtensions.contains(extension(file.path))) {
+          _mediaFiles.add(MediaFile(filename: file.path));
+        } else {
+          print("File not supported: ${file.path}");
+        }
       }
     },
         // should also register onError
         onDone: () {
-      completer.complete(_mediaFiles);
+// This is adding the list of files a second time! (all files ... without filtering)
+//      completer.complete(_mediaFiles);
       callback();
     });
 
