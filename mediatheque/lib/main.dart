@@ -298,9 +298,8 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
                 Row(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    const Text('Name:'),
                     SizedBox(
-                      width: 190,
+                      width: 230,
                       child: TextField(
                         controller: dirController,
                       ),
