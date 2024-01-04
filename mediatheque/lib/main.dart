@@ -99,6 +99,8 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
     super.initState();
 
     checkPermission();
+    // This is just for debugging and should be removed at some point:
+    createSettings();
     loadSettings();
   }
 
@@ -108,41 +110,54 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
     super.dispose();
   }
 
+  void createSettings() async {
+    // Create a sqlite database if not there yet and store these settings (if not there yet):
+    await settingsDatabase.create(key: "setting", type: "media_directory", value: "/storage/emulated/0/Download/");
+    await settingsDatabase.create(type: "setting", key: "default_tab", value: "Media");
+  }
+
+  /// Load the settings from the backend database.
   void loadSettings() {
-    setState(() {
-      settingsDatabase.fetchAll().then((settings) {
-        for (var setting in settings) {
-          switch (setting.type) {
-            // Process app settings:
-            case "setting":
-              switch (setting.key) {
-                // Process media directory path:
-                case "media_directory":
-                  mediaDirectory = setting.value;
-                // Process display theme setting:
-                case "theme":
-                  setTheme(themeName: setting.value);
-                  break;
-                // Process default tab setting:
-                case "default_tab":
-                  ApplicationSetting.defaultTab = setting.value;
-                  statusText += "\nSelect tab: ${ApplicationSetting.defaultTab}";
-                  break;
-              }
-              break;
-          }
+    // Read all setting records asynchronously, then loop through them:
+    print("Read settings...");
+    settingsDatabase.fetchAll().then((settings) {
+      print("Settings read!");
+      print(settings);
+      for (var setting in settings) {
+        print("setting: ${setting.type} - ${setting.key} - ${setting.value}");
+        switch (setting.type) {
+          // Process app settings:
+          case "setting":
+            switch (setting.key) {
+              // Process media directory path:
+              case "media_directory":
+                mediaDirectory = setting.value;
+              // Process display theme setting:
+              case "theme":
+                setTheme(themeName: setting.value);
+                break;
+              // Process default tab setting:
+              case "default_tab":
+                ApplicationSetting.defaultTab = setting.value;
+                statusText += "\nSelect tab: ${ApplicationSetting.defaultTab}";
+                break;
+            }
+            break;
         }
-        // Set the default directory if not found in the settings:
-        if (mediaDirectory.isEmpty) {
-//          getPublicDirectoryPath();
-          // Get a list of root paths and take the 1st:
-          getRootPaths().then((dirList) {
-            mediaDirectory = "${dirList[0]}/Download";
-          });
-        }
+      }
+      // Set the default directory if not found in the settings:
+      if (mediaDirectory.isEmpty) {
+//        getPublicDirectoryPath();
+        // Get a list of root paths and take the first:
+        getRootPaths().then((dirList) {
+          mediaDirectory = "${dirList[0]}/Download";
+          // Get a file listing and update the UI:
+          refreshList();
+        });
+      } else {
         // Get a file listing and update the UI:
         refreshList();
-      });
+      }
     });
   }
 
@@ -279,17 +294,18 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
   Future selectDirectory(Function callback) async {
     // Get a list of root paths and take the 1st:
     late String rootDir;
-    getRootPaths().then((dirList) {
-      rootDir = dirList[0];
+    getRootPaths().then((dirList) async {
+      rootDir = "${dirList[0]}/";
+      statusText = "Root: $rootDir";
+      String? path = await FilesystemPicker.open(
+        title: 'Select folder',
+        context: this.context,
+        rootDirectory: Directory(rootDir),
+        fsType: FilesystemType.folder,
+        pickText: 'Select media folder',
+      );
+      callback(path);
     });
-    String? path = await FilesystemPicker.open(
-      title: 'Select folder',
-      context: this.context,
-      rootDirectory: Directory(rootDir),
-      fsType: FilesystemType.folder,
-      pickText: 'Select media folder',
-    );
-    callback(path);
   }
 
   /// Show a window where the user can enter a directory
