@@ -135,7 +135,10 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
         // Set the default directory if not found in the settings:
         if (mediaDirectory.isEmpty) {
 //          getPublicDirectoryPath();
-          mediaDirectory = "/storage/emulated/0/Documents";
+          // Get a list of root paths and take the 1st:
+          getRootPaths().then((dirList) {
+            mediaDirectory = "${dirList[0]}/Download";
+          });
         }
         // Get a file listing and update the UI:
         refreshList();
@@ -143,16 +146,17 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
     });
   }
 
-//   /// Get storage directory paths
-//   /// Like internal and external (SD card) storage path
-//   Future<void> getPath() async {
-//     List<String> paths;
-//     // getExternalStorageDirectories() will return list containing internal storage directory path
-//     // And external storage (SD card) directory path (if exists)
-//     paths = await ExternalPath.getExternalStorageDirectories();
-//     // ex: [/storage/emulated/0, /storage/B3AE-4D28]
-//     print("paths: $paths");
-//   }
+  /// Get storage directory paths
+  /// Like internal and external (SD card) storage path
+  Future<List<String>> getRootPaths() async {
+    List<String> paths;
+    // getExternalStorageDirectories() will return list containing internal storage directory path
+    // And external storage (SD card) directory path (if exists)
+    paths = await ExternalPath.getExternalStorageDirectories();
+    // ex: [/storage/emulated/0, /storage/B3AE-4D28]
+    print("paths: $paths");
+    return paths;
+  }
 
   // To get public storage directory path like Downloads, Picture, Movie etc.
   // Use below code
@@ -196,7 +200,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
         callback: (() {
           setState(() {
             // Update the UI
-            statusText = "UPDATE UI";
+            statusText = "Directory: $mediaDirectory";
           });
         }));
     for (final file in files) {
@@ -208,11 +212,13 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
     print("Menu: $menuItem");
     switch (menuItem) {
       case (Menu.SetDirectory):
-        selectDirectory(((newDirName) {
+        showDirectorySelector(((newDirName) {
+          // A new directory was selected.  Save in the settings and get a new file list:
           setState(() {
             mediaDirectory = newDirName;
             statusText = "New dir: $newDirName";
-            print("Dir: $mediaDirectory");
+            settingsDatabase.update(type: "setting", key: "media_directory", value: newDirName);
+            refreshList();
           });
         }));
         break;
@@ -269,21 +275,25 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
     }
   }
 
-  Future<String> selectFolder(Function callback) async {
-// Get root directory:
-//    String rootDirectory = await ExternalPath.getExternalStoragePublicDirectory(ExternalPath.ROO);
+  /// Show a directory selector popup
+  Future selectDirectory(Function callback) async {
+    // Get a list of root paths and take the 1st:
+    late String rootDir;
+    getRootPaths().then((dirList) {
+      rootDir = dirList[0];
+    });
     String? path = await FilesystemPicker.open(
       title: 'Select folder',
       context: this.context,
-      rootDirectory: Directory("/storage/emulated/0/"),
+      rootDirectory: Directory(rootDir),
       fsType: FilesystemType.folder,
       pickText: 'Select media folder',
     );
     callback(path);
-    return path ?? "";
   }
 
-  void selectDirectory(Function callback) {
+  /// Show a window where the user can enter a directory
+  void showDirectorySelector(Function callback) {
     final dirController = TextEditingController(text: mediaDirectory);
 
     showDialog(
@@ -305,16 +315,12 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
                       ),
                     ),
                     IconButton(
-                      onPressed: (() {
-                        selectFolder((newFolder) {
-                          setState(() {
-                            statusText = "Folder: $newFolder";
-                            print("Folder: $newFolder");
-                            mediaDirectory = newFolder;
-                            dirController.text = newFolder;
-                            refreshList();
-                          });
-                        });
+                      onPressed: () => selectDirectory((newFolder) {
+                        // A new directory was selected.
+                        // Save it in the settings and no need to continue the input.
+                        statusText = "Folder: $newFolder";
+                        callback(newFolder);
+                        Navigator.of(context).pop();
                       }),
                       icon: const Icon(Icons.folder),
                     )
@@ -389,30 +395,35 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
           )
         ],
       ),
-      body: _mediaFiles.files.isNotEmpty
-          ? ListView.builder(
-              padding: EdgeInsets.fromLTRB(10, 10, 10, 10),
-              scrollDirection: Axis.vertical,
-              itemCount: _mediaFiles.files.length,
-              itemBuilder: (BuildContext context, int index) {
-                MediaFile song = _mediaFiles.files[index];
-                return GestureDetector(
-                  child: Card(
-                      child: Padding(
-                          padding: const EdgeInsets.all(10),
-                          child: Text(
-                            song.baseFileName,
-                            style: TextStyle(fontSize: 18),
-                          ))),
-                  onTap: () {
-                    setState(() {
-                      statusText = "click $song";
-                    });
+      body: RefreshIndicator(
+          onRefresh: () async {
+            // The page got pulled down.  We need to refresh the file list:
+            refreshList();
+          },
+          child: _mediaFiles.files.isNotEmpty
+              ? ListView.builder(
+                  padding: EdgeInsets.fromLTRB(10, 10, 10, 10),
+                  scrollDirection: Axis.vertical,
+                  itemCount: _mediaFiles.files.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    MediaFile song = _mediaFiles.files[index];
+                    return GestureDetector(
+                      child: Card(
+                          child: Padding(
+                              padding: const EdgeInsets.all(10),
+                              child: Text(
+                                song.baseFileName,
+                                style: TextStyle(fontSize: 18),
+                              ))),
+                      onTap: () {
+                        setState(() {
+                          statusText = "click $song";
+                        });
+                      },
+                    );
                   },
-                );
-              },
-            )
-          : const Center(child: Text('No Files')),
+                )
+              : const Center(child: Text('No Files'))),
       bottomNavigationBar: Container(
         color: Colors.green[900],
         child: Text(statusText, style: TextStyle(color: Colors.yellow)),
