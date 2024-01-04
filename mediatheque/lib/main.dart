@@ -270,13 +270,16 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
   }
 
   Future<String> selectFolder(Function callback) async {
+// Get root directory:
+//    String rootDirectory = await ExternalPath.getExternalStoragePublicDirectory(ExternalPath.ROO);
     String? path = await FilesystemPicker.open(
       title: 'Select folder',
       context: this.context,
-      rootDirectory: Directory(mediaDirectory),
+      rootDirectory: Directory("/storage/emulated/0/"),
       fsType: FilesystemType.folder,
-      pickText: 'Select a media folder',
+      pickText: 'Select media folder',
     );
+    callback(path);
     return path ?? "";
   }
 
@@ -309,6 +312,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
                             statusText = "Folder: $newFolder";
                             print("Folder: $newFolder");
                             mediaDirectory = newFolder;
+                            dirController.text = newFolder;
                             refreshList();
                           });
                         });
