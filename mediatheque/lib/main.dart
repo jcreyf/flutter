@@ -22,6 +22,10 @@ import 'package:permission_handler/permission_handler.dart';
 //   https://pub.dev/packages/flutter_phoenix
 //   /> flutter pub add flutter_phoenix
 import 'package:flutter_phoenix/flutter_phoenix.dart';
+// Used to select a directory:
+//   https://pub.dev/packages/filesystem_picker
+//   /> flutter pub add filesystem_picker
+import 'package:filesystem_picker/filesystem_picker.dart';
 
 void main() {
   runApp(
@@ -265,6 +269,17 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
     }
   }
 
+  Future<String> selectFolder(Function callback) async {
+    String? path = await FilesystemPicker.open(
+      title: 'Select folder',
+      context: this.context,
+      rootDirectory: Directory(mediaDirectory),
+      fsType: FilesystemType.folder,
+      pickText: 'Select a media folder',
+    );
+    return path ?? "";
+  }
+
   void selectDirectory(Function callback) {
     final dirController = TextEditingController(text: mediaDirectory);
 
@@ -282,11 +297,24 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
                   children: [
                     const Text('Name:'),
                     SizedBox(
-                      width: 220,
+                      width: 190,
                       child: TextField(
                         controller: dirController,
                       ),
                     ),
+                    IconButton(
+                      onPressed: (() {
+                        selectFolder((newFolder) {
+                          setState(() {
+                            statusText = "Folder: $newFolder";
+                            print("Folder: $newFolder");
+                            mediaDirectory = newFolder;
+                            refreshList();
+                          });
+                        });
+                      }),
+                      icon: const Icon(Icons.folder),
+                    )
                   ],
                 ),
               ],
