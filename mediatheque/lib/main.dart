@@ -33,8 +33,8 @@ import 'package:filesystem_picker/filesystem_picker.dart';
 // Used to play audio:
 //   https://pub.dev/packages/just_audio/install
 //   /> flutter pub add just_audio
-//import 'package:just_audio/just_audio.dart';
-//import 'package:audio_session/audio_session.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:audio_session/audio_session.dart';
 
 void main() {
   runApp(
@@ -367,9 +367,9 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
   }
 
   void clickedFile(MediaFile mediaFile) async {
-//    final player = AudioPlayer();
-//    final duration = await player.setFilePath(mediaFile.fileFullPath);
-    int duration = 19;
+    final player = AudioPlayer();
+    final duration = await player.setFilePath(mediaFile.fileFullPath);
+//    int duration = 19;
 // https://www.youtube.com/watch?v=TlvR0JvuNYQ
     setState(() {
       statusText = "clicked: ${mediaFile.fileName} ($duration seconds)";
