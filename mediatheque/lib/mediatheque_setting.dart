@@ -132,6 +132,7 @@ class SettingsDatabase {
     return ApplicationSetting.fromSqfliteDatabase(ledstripSetting.first);
   }
 
+  /// Update a record.
   Future<int> update({required String type, required String key, String newKey = "", required String value}) async {
     final database = await DatabaseService().database;
     if (newKey == "") newKey = key;
@@ -144,6 +145,15 @@ class SettingsDatabase {
     );
   }
 
+  /// Insert a new record or update the values if the record already exists.
+  ///   https://stackoverflow.com/questions/3634984/insert-if-not-exists-else-update
+  Future<void> insertOrUpdate({required String type, required String key, String newKey = "", required String value}) async {
+    final database = await DatabaseService().database;
+    if (newKey == "") newKey = key;
+    await database.rawQuery('''insert or replace into $tableName (type, key, value, updated_at) values ('$type', '$newKey', '$value', '${DateTime.now().millisecondsSinceEpoch}')''');
+  }
+
+  /// Delete a record.
   Future<void> delete({required String type, String key = "N/A"}) async {
     final database = await DatabaseService().database;
     if (key == "N/A") {

@@ -14,8 +14,12 @@ import 'package:mediatheque/media_files.dart';
 import 'package:mediatheque/media_file.dart';
 import 'package:external_path/external_path.dart';
 import 'package:path/path.dart';
-// https://pub.dev/packages/permission_handler
-// https://github.com/baseflow/flutter-permission-handler
+// Logging stuff:
+//   https://pub.dev/packages/logger
+//   /> flutter pub add logger
+import 'package:logger/logger.dart';
+//   https://pub.dev/packages/permission_handler
+//   https://github.com/baseflow/flutter-permission-handler
 //   /> flutter pub add permission_handler
 import 'package:permission_handler/permission_handler.dart';
 // Used to dynamically restart the app:
@@ -26,6 +30,11 @@ import 'package:flutter_phoenix/flutter_phoenix.dart';
 //   https://pub.dev/packages/filesystem_picker
 //   /> flutter pub add filesystem_picker
 import 'package:filesystem_picker/filesystem_picker.dart';
+// Used to play audio:
+//   https://pub.dev/packages/just_audio/install
+//   /> flutter pub add just_audio
+//import 'package:just_audio/just_audio.dart';
+//import 'package:audio_session/audio_session.dart';
 
 void main() {
   runApp(
@@ -86,6 +95,7 @@ class MediathequeHomePage extends StatefulWidget {
 //-------------
 
 class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerProviderStateMixin {
+  final Logger logger = Logger();
   final settingsDatabase = SettingsDatabase();
   MediaFiles _mediaFiles = MediaFiles();
   late TabController tabController;
@@ -99,8 +109,6 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
     super.initState();
 
     checkPermission();
-    // This is just for debugging and should be removed at some point:
-    createSettings();
     loadSettings();
   }
 
@@ -108,12 +116,6 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
   void dispose() {
     tabController.dispose();
     super.dispose();
-  }
-
-  void createSettings() async {
-    // Create a sqlite database if not there yet and store these settings (if not there yet):
-    await settingsDatabase.create(key: "setting", type: "media_directory", value: "/storage/emulated/0/Download/");
-    await settingsDatabase.create(type: "setting", key: "default_tab", value: "Media");
   }
 
   /// Load the settings from the backend database.
@@ -223,6 +225,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
     }
   }
 
+  /// Process a menu selection.
   void menuAction(String menuItem) {
     print("Menu: $menuItem");
     switch (menuItem) {
@@ -232,7 +235,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
           setState(() {
             mediaDirectory = newDirName;
             statusText = "New dir: $newDirName";
-            settingsDatabase.update(type: "setting", key: "media_directory", value: newDirName);
+            settingsDatabase.insertOrUpdate(type: "setting", key: "media_directory", value: newDirName);
             refreshList();
           });
         }));
@@ -281,7 +284,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
         break;
     }
     statusText = "Switching to $themeName theme";
-    settingsDatabase.update(type: "setting", key: "theme", value: themeName);
+    settingsDatabase.insertOrUpdate(type: "setting", key: "theme", value: themeName);
   }
 
   void onTabChange() {
@@ -363,6 +366,23 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
         });
   }
 
+  void clickedFile(MediaFile mediaFile) async {
+//    final player = AudioPlayer();
+//    final duration = await player.setFilePath(mediaFile.fileFullPath);
+    int duration = 19;
+// https://www.youtube.com/watch?v=TlvR0JvuNYQ
+    setState(() {
+      statusText = "clicked: ${mediaFile.fileName} ($duration seconds)";
+    });
+//    player.play();
+//    await player.play();                            // Play while waiting for completion
+//    await player.pause();                           // Pause but remain ready to play
+//    await player.seek(Duration(second: 10));        // Jump to the 10 second position
+//    await player.setSpeed(2.0);                     // Twice as fast
+//    await player.setVolume(0.5);                    // Half as loud
+//    await player.stop();                            // Stop and free resources
+  }
+
   @override
   Widget build(BuildContext context) {
     // We need our own custom tab controller to keep track of which tab is active:
@@ -431,11 +451,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
                                 song.baseFileName,
                                 style: TextStyle(fontSize: 18),
                               ))),
-                      onTap: () {
-                        setState(() {
-                          statusText = "click $song";
-                        });
-                      },
+                      onTap: () => clickedFile(song),
                     );
                   },
                 )
