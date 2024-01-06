@@ -37,7 +37,7 @@ class MediaFile {
   }
 
   String get fileFullPath {
-    return "$_fileLocation\$_fileName";
+    return "${_fileLocation}\${_fileName}";
   }
 
   set fileFullPath(String fullPath) {

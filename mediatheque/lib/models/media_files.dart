@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:async';
 //import 'package:path/path.dart';
-import 'package:mediatheque/media_file.dart';
+import 'package:mediatheque/models/media_file.dart';
 import 'package:path/path.dart';
 
 class MediaFiles {
