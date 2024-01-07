@@ -100,26 +100,33 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
   final settingsDatabase = SettingsDatabase();
   MediaFiles _mediaFiles = MediaFiles();
   late TabController tabController;
-  List<String> tabNames = ["Media", "Logs"];
+  List<String> tabNames = ["Media", "Player", "Logs"];
   int currentTab = 0;
   String statusText = "No Files...";
   String mediaDirectory = "";
 
   bool playing = false;
+  MediaFile playingMediaFile = MediaFile(filename: "");
   late AudioPlayer player;
   Duration position = Duration();
   Duration musicLength = Duration();
 
   Widget slider() {
-    return Slider.adaptive(
-        activeColor: Colors.blue[800],
-        inactiveColor: Colors.grey[850],
-        value: position.inSeconds.toDouble(),
-        max: musicLength.inSeconds.toDouble(),
-        onChanged: (value) {
-          print("slide value: $value");
-          seekToSec(value.toInt());
-        });
+    Widget retVal;
+    if (playing) {
+      retVal = Slider.adaptive(
+          activeColor: Colors.blue[800],
+          inactiveColor: Colors.grey[850],
+          value: position.inSeconds.toDouble(),
+          max: musicLength.inSeconds.toDouble(),
+          onChanged: (value) {
+            print("slide value: $value");
+            seekToSec(value.toInt());
+          });
+    } else {
+      retVal = const Text("Nothing playing");
+    }
+    return retVal;
   }
 
   void seekToSec(int sec) {
@@ -392,27 +399,35 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
         });
   }
 
+  // await player.play();                            // Play while waiting for completion
+  // await player.pause();                           // Pause but remain ready to play
+  // await player.seek(Duration(second: 10));        // Jump to the 10 second position
+  // await player.setSpeed(2.0);                     // Twice as fast
+  // await player.setVolume(0.5);                    // Half as loud
+  // await player.stop();                            // Stop and free resources
   void clickedFile(MediaFile mediaFile) async {
-    setState(() {
-      statusText = "clicked: ${mediaFile.fileName}";
-      print("clicked: ${mediaFile.fileName}");
-    });
-    await player.setFilePath(mediaFile.fileName).then((duration) {
-      musicLength = duration ?? const Duration(seconds: 0);
-      player.play();
-    });
-
-// https://www.youtube.com/watch?v=TlvR0JvuNYQ
-    setState(() {
-      statusText = "playing: ${mediaFile.fileName} (${musicLength.inSeconds} seconds)";
-    });
-//    player.play();
-//    await player.play();                            // Play while waiting for completion
-//    await player.pause();                           // Pause but remain ready to play
-//    await player.seek(Duration(second: 10));        // Jump to the 10 second position
-//    await player.setSpeed(2.0);                     // Twice as fast
-//    await player.setVolume(0.5);                    // Half as loud
-//    await player.stop();                            // Stop and free resources
+    if (mediaFile.fileName == playingMediaFile.fileName) {
+      // The user clicked on the file that is currently playing.
+      // Stop the player!
+      await player.stop();
+      playing = false;
+      playingMediaFile = MediaFile(filename: "");
+      setState(() {
+        statusText = "stop playing: ${mediaFile.fileName}";
+      });
+    } else {
+      // The user clicked on a file.
+      // Start playing it!
+      playingMediaFile = mediaFile;
+      setState(() {
+        statusText = "playing: ${playingMediaFile.fileName} (${musicLength.inSeconds} seconds)";
+      });
+      await player.setFilePath(playingMediaFile.fileName).then((duration) {
+        playing = true;
+        musicLength = duration ?? const Duration(seconds: 0);
+        player.play();
+      });
+    }
   }
 
   @override
@@ -463,47 +478,54 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
           )
         ],
       ),
-      body: Container(
-        // Body background
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.green[900] ?? Colors.green,
-              Colors.green[200] ?? Colors.red,
-            ],
+      body: TabBarView(
+        controller: tabController,
+        children: <Widget>[
+          Container(
+            // Body background
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.green[900] ?? Colors.green,
+                  Colors.green[200] ?? Colors.red,
+                ],
+              ),
+            ),
+            child: RefreshIndicator(
+                onRefresh: () async {
+                  // The page got pulled down.  We need to refresh the file list:
+                  refreshList();
+                },
+                child: _mediaFiles.files.isNotEmpty
+                    ? ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+                        scrollDirection: Axis.vertical,
+                        itemCount: _mediaFiles.files.length,
+                        itemBuilder: (BuildContext context, int index) {
+                          MediaFile song = _mediaFiles.files[index];
+                          return GestureDetector(
+                            child: Card(
+                                child: Padding(
+                                    padding: const EdgeInsets.all(10),
+                                    child: Text(
+                                      song.baseFileName,
+                                      style: const TextStyle(fontSize: 18),
+                                    ))),
+                            onTap: () => clickedFile(song),
+                          );
+                        },
+                      )
+                    : const Center(child: Text('No Files'))),
           ),
-        ),
-        child: RefreshIndicator(
-            onRefresh: () async {
-              // The page got pulled down.  We need to refresh the file list:
-              refreshList();
-            },
-            child: _mediaFiles.files.isNotEmpty
-                ? ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-                    scrollDirection: Axis.vertical,
-                    itemCount: _mediaFiles.files.length,
-                    itemBuilder: (BuildContext context, int index) {
-                      MediaFile song = _mediaFiles.files[index];
-                      return GestureDetector(
-                        child: Card(
-                            child: Padding(
-                                padding: const EdgeInsets.all(10),
-                                child: Text(
-                                  song.baseFileName,
-                                  style: const TextStyle(fontSize: 18),
-                                ))),
-                        onTap: () => clickedFile(song),
-                      );
-                    },
-                  )
-                : const Center(child: Text('No Files'))),
+          slider(),
+          const Text("No logs"),
+        ],
       ),
       bottomNavigationBar: Container(
         color: Colors.green[900],
-        child: Text(statusText, style: TextStyle(color: Colors.yellow)),
+        child: Text(statusText, style: const TextStyle(color: Colors.yellow)),
       ),
     );
   }
