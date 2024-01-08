@@ -108,25 +108,64 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
   bool playing = false;
   MediaFile playingMediaFile = MediaFile(filename: "");
   late AudioPlayer player;
-  Duration position = Duration();
-  Duration musicLength = Duration();
+  Duration position = const Duration(seconds: 0);
+  Duration musicLength = const Duration(seconds: 0);
 
   Widget slider() {
-    Widget retVal;
-    if (playing) {
-      retVal = Slider.adaptive(
-          activeColor: Colors.blue[800],
-          inactiveColor: Colors.grey[850],
-          value: position.inSeconds.toDouble(),
-          max: musicLength.inSeconds.toDouble(),
-          onChanged: (value) {
-            print("slide value: $value");
-            seekToSec(value.toInt());
-          });
-    } else {
-      retVal = const Text("Nothing playing");
-    }
-    return retVal;
+    return Column(
+      children: [
+        playing ? Text(playingMediaFile.baseFileName) : const Text("Nothing playing"),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("${position.inMinutes}:${position.inSeconds}"),
+            Slider.adaptive(
+                activeColor: Colors.blue[800],
+                inactiveColor: Colors.grey[850],
+                value: position.inSeconds.toDouble(),
+                max: musicLength.inSeconds.toDouble(),
+                onChanged: (value) {
+                  print("slide value: $value");
+                  seekToSec(value.toInt());
+                }),
+            Text("${musicLength.inMinutes}:${musicLength.inSeconds}"),
+          ],
+        ),
+        IconButton(
+          icon: const Icon(Icons.fast_rewind),
+          onPressed: () {
+            setState(() {
+              print("Rewind");
+              if (playing) {
+                player.seek(Duration.zero);
+              }
+            });
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.play_arrow),
+          onPressed: () {
+            setState(() {
+              print("Play");
+              if (playing) {
+                player.stop();
+              }
+            });
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.fast_forward),
+          onPressed: () {
+            setState(() {
+              print("Forward");
+              if (playing) {
+                player.seek(Duration.zero);
+              }
+            });
+          },
+        ),
+      ],
+    );
   }
 
   void seekToSec(int sec) {
