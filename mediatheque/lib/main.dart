@@ -113,12 +113,25 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
 
   Widget slider() {
     return Column(
-      children: [
-        playing ? Text(playingMediaFile.baseFileName) : const Text("Nothing playing"),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("${position.inMinutes}:${position.inSeconds}"),
+      children: <Widget>[
+        SizedBox(height: 50),
+        playing
+            ? Text(
+                playingMediaFile.baseFileName,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.amber[50], backgroundColor: Colors.amber[900], fontWeight: FontWeight.bold, fontSize: 25),
+              )
+            : const Text(
+                "Nothing playing",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 25),
+              ),
+        SizedBox(height: 100),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: <Widget>[
+            Text(
+                "${position.inHours.toString().length <= 1 ? "0${position.inHours}" : "${position.inHours}"}:${position.inMinutes.remainder(60).toString().length <= 1 ? "0${position.inMinutes.remainder(60)}" : "${position.inMinutes.remainder(60)}"}:${position.inSeconds.remainder(60).toString().length <= 1 ? "0${position.inSeconds.remainder(60)}" : "${position.inSeconds.remainder(60)}"}"),
             Slider.adaptive(
                 activeColor: Colors.blue[800],
                 inactiveColor: Colors.grey[850],
@@ -128,41 +141,48 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
                   print("slide value: $value");
                   seekToSec(value.toInt());
                 }),
-            Text("${musicLength.inMinutes}:${musicLength.inSeconds}"),
+            Text(
+                "${musicLength.inHours.toString().length <= 1 ? "0${musicLength.inHours}" : "${musicLength.inHours}"}:${musicLength.inMinutes.remainder(60).toString().length <= 1 ? "0${musicLength.inMinutes.remainder(60)}" : "${musicLength.inMinutes.remainder(60)}"}:${musicLength.inSeconds.remainder(60).toString().length <= 1 ? "0${musicLength.inSeconds.remainder(60)}" : "${musicLength.inSeconds.remainder(60)}"}"),
           ],
         ),
-        IconButton(
-          icon: const Icon(Icons.fast_rewind),
-          onPressed: () {
-            setState(() {
-              print("Rewind");
-              if (playing) {
-                player.seek(Duration.zero);
-              }
-            });
-          },
-        ),
-        IconButton(
-          icon: const Icon(Icons.play_arrow),
-          onPressed: () {
-            setState(() {
-              print("Play");
-              if (playing) {
-                player.stop();
-              }
-            });
-          },
-        ),
-        IconButton(
-          icon: const Icon(Icons.fast_forward),
-          onPressed: () {
-            setState(() {
-              print("Forward");
-              if (playing) {
-                player.seek(Duration.zero);
-              }
-            });
-          },
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: <Widget>[
+            IconButton(
+              icon: const Icon(Icons.fast_rewind),
+              onPressed: () {
+                setState(() {
+                  print("Rewind");
+                  if (playing) {
+                    player.seek(Duration.zero);
+                  }
+                });
+              },
+            ),
+            IconButton(
+              icon: playing ? const Icon(Icons.pause) : const Icon(Icons.play_arrow),
+              onPressed: () {
+                setState(() {
+                  print("Play");
+                  if (playing) {
+                    player.stop();
+                  }
+                  playing = !playing;
+                });
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.fast_forward),
+              onPressed: () {
+                setState(() {
+                  print("Forward");
+                  if (playing) {
+                    player.seek(Duration.zero);
+                  }
+                });
+              },
+            ),
+          ],
         ),
       ],
     );
@@ -459,7 +479,9 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
       // Start playing it!
       playingMediaFile = mediaFile;
       setState(() {
-        statusText = "playing: ${playingMediaFile.fileName} (${musicLength.inSeconds} seconds)";
+        String _time =
+            "${musicLength.inHours.toString().length <= 1 ? "0${musicLength.inHours}" : "${musicLength.inHours}"}:${musicLength.inMinutes.remainder(60).toString().length <= 1 ? "0${musicLength.inMinutes.remainder(60)}" : "${musicLength.inMinutes.remainder(60)}"}:${musicLength.inSeconds.remainder(60).toString().length <= 1 ? "0${musicLength.inSeconds.remainder(60)}" : "${musicLength.inSeconds.remainder(60)}"}";
+        statusText = "playing: ${playingMediaFile.fileName} ($_time)";
       });
       await player.setFilePath(playingMediaFile.fileName).then((duration) {
         playing = true;

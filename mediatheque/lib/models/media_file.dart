@@ -4,6 +4,7 @@ import 'package:path/path.dart';
 class MediaFile {
   String _fileName = "";
   String _fileLocation = "";
+  String _duration = "00:00:00";
   int _lengthInSeconds = 0;
   int _lastListenedSecond = 0;
 
@@ -65,5 +66,10 @@ class MediaFile {
 
   int get mediaNumberOfSeconds {
     return _lengthInSeconds;
+  }
+
+  String get duration {
+    return "00:00:00";
+//    return "${musicLength.inHours.toString().length <= 1 ? "0${musicLength.inHours}" : "${musicLength.inHours}"}:${musicLength.inMinutes.remainder(60).toString().length <= 1 ? "0${musicLength.inMinutes.remainder(60)}" : "${musicLength.inMinutes.remainder(60)}"}:${musicLength.inSeconds.remainder(60).toString().length <= 1 ? "0${musicLength.inSeconds.remainder(60)}" : "${musicLength.inSeconds.remainder(60)}"}");
   }
 }
