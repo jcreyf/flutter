@@ -45,7 +45,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 Future<void> main() async {
   await JustAudioBackground.init(
     androidNotificationChannelId: 'com.jocreyf.mediatheque.channel.audio',
-    androidNotificationChannelName: 'Mediatheque audio playback',
+    androidNotificationChannelName: 'Audio playback',
     androidNotificationOngoing: true,
   );
   runApp(
