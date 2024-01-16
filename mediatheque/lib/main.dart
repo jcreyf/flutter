@@ -35,9 +35,19 @@ import 'package:filesystem_picker/filesystem_picker.dart';
 //   https://pub.dev/packages/just_audio/install
 //   /> flutter pub add just_audio
 import 'package:just_audio/just_audio.dart';
-import 'package:audio_session/audio_session.dart';
+// Used for playing media in the background:
+import 'package:just_audio_background/just_audio_background.dart';
+//import 'package:audio_session/audio_session.dart';
 
-void main() {
+// Start point of the app.
+// This needs to be a future / async method to support it running in the background
+// (media playing in the background)
+Future<void> main() async {
+  await JustAudioBackground.init(
+    androidNotificationChannelId: 'com.jocreyf.mediatheque.channel.audio',
+    androidNotificationChannelName: 'Mediatheque audio playback',
+    androidNotificationOngoing: true,
+  );
   runApp(
       // Wrapping the app in a Phoenix widget that we can use to hot restart when needed.
       // (the Phoenix widget basically generates a new 'key' on itself, invalidating the
@@ -114,76 +124,146 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
   Widget slider() {
     return Column(
       children: <Widget>[
-        SizedBox(height: 50),
-        playing
-            ? Text(
-                playingMediaFile.baseFileName,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.amber[50], backgroundColor: Colors.amber[900], fontWeight: FontWeight.bold, fontSize: 25),
-              )
-            : const Text(
+        const SizedBox(height: 50),
+        playingMediaFile.fileName == ""
+            ? const Text(
                 "Nothing playing",
                 textAlign: TextAlign.center,
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 25),
+              )
+            : Text(
+                playingMediaFile.baseFileName,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 30),
               ),
-        SizedBox(height: 100),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: <Widget>[
-            Text(
-                "${position.inHours.toString().length <= 1 ? "0${position.inHours}" : "${position.inHours}"}:${position.inMinutes.remainder(60).toString().length <= 1 ? "0${position.inMinutes.remainder(60)}" : "${position.inMinutes.remainder(60)}"}:${position.inSeconds.remainder(60).toString().length <= 1 ? "0${position.inSeconds.remainder(60)}" : "${position.inSeconds.remainder(60)}"}"),
-            Slider.adaptive(
-                activeColor: Colors.blue[800],
-                inactiveColor: Colors.grey[850],
-                value: position.inSeconds.toDouble(),
-                max: musicLength.inSeconds.toDouble(),
-                onChanged: (value) {
-                  print("slide value: $value");
-                  seekToSec(value.toInt());
-                }),
-            Text(
-                "${musicLength.inHours.toString().length <= 1 ? "0${musicLength.inHours}" : "${musicLength.inHours}"}:${musicLength.inMinutes.remainder(60).toString().length <= 1 ? "0${musicLength.inMinutes.remainder(60)}" : "${musicLength.inMinutes.remainder(60)}"}:${musicLength.inSeconds.remainder(60).toString().length <= 1 ? "0${musicLength.inSeconds.remainder(60)}" : "${musicLength.inSeconds.remainder(60)}"}"),
-          ],
-        ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: <Widget>[
-            IconButton(
-              icon: const Icon(Icons.fast_rewind),
-              onPressed: () {
-                setState(() {
-                  print("Rewind");
-                  if (playing) {
-                    player.seek(Duration.zero);
-                  }
-                });
-              },
-            ),
-            IconButton(
-              icon: playing ? const Icon(Icons.pause) : const Icon(Icons.play_arrow),
-              onPressed: () {
-                setState(() {
-                  print("Play");
-                  if (playing) {
-                    player.stop();
-                  }
-                  playing = !playing;
-                });
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.fast_forward),
-              onPressed: () {
-                setState(() {
-                  print("Forward");
-                  if (playing) {
-                    player.seek(Duration.zero);
-                  }
-                });
-              },
-            ),
-          ],
-        ),
+        const SizedBox(height: 100),
+        // The next widgets needs constant updating based on events in the autio sream:
+        StreamBuilder(
+            stream: player.positionStream,
+            builder: (context, snapshot) {
+              final Duration positionData = snapshot.data ?? const Duration();
+              // Save the current timestamp every 30 seconds:
+              if (positionData.inSeconds % 30 == 0) {
+                playingMediaFile.lastListenedSecond = positionData.inSeconds;
+              }
+              return Column(
+                children: [
+                  // Media timestamps:
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: <Widget>[
+                      Text(
+                        MediaFile.timeFormat(time: positionData ?? const Duration()),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 25),
+                      ),
+                      Text(
+                        MediaFile.timeFormat(time: musicLength),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 25),
+                      ),
+                    ],
+                  ),
+                  // Media slider:
+                  SliderTheme(
+                    data: SliderTheme.of(widget.context).copyWith(
+                      activeTrackColor: Colors.blue[950],
+                      inactiveTrackColor: Colors.grey[500],
+                      trackShape: const RectangularSliderTrackShape(),
+                      trackHeight: 20.0,
+                      thumbColor: Colors.blue[900],
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 20.0),
+                      overlayColor: Colors.red.withAlpha(32),
+                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 40.0),
+                    ),
+                    child: Container(
+                      width: 400,
+                      child: Slider(
+                        min: 0.0,
+                        max: musicLength.inSeconds.toDouble(),
+                        divisions: 1 + musicLength.inSeconds,
+                        value: positionData?.inSeconds.toDouble() ?? 0.0,
+                        onChanged: (double moveToSec) {
+                          setState(() {
+                            print("slide value 2: $moveToSec");
+                            seekToSec(moveToSec.toInt());
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  // Media controls:
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: <Widget>[
+                      IconButton(
+                        icon: const Icon(Icons.first_page, size: 50),
+                        onPressed: () {
+                          setState(() {
+                            if (playing) {
+                              player.seek(Duration.zero);
+                            }
+                          });
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.replay_30, size: 50),
+                        onPressed: () {
+                          setState(() {
+                            if (playing) {
+                              int currentSeconds = positionData.inSeconds;
+                              if (currentSeconds > 30) {
+                                player.seek(Duration(seconds: currentSeconds - 30));
+                              } else {
+                                player.seek(Duration.zero);
+                              }
+                            }
+                          });
+                        },
+                      ),
+                      IconButton(
+                        icon: playingMediaFile.fileName != "" && playing ? const Icon(Icons.pause, size: 70) : const Icon(Icons.play_arrow, size: 70),
+                        onPressed: () {
+                          setState(() {
+                            if (playing) {
+                              player.stop();
+                            } else {
+                              player.play();
+                            }
+                            playing = !playing;
+                          });
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.forward_30, size: 50),
+                        onPressed: () {
+                          setState(() {
+                            if (playing) {
+                              int currentSeconds = positionData.inSeconds;
+                              int targetSeconds = currentSeconds + 30;
+                              int totalSeconds = musicLength.inSeconds;
+                              if (targetSeconds < totalSeconds) {
+                                player.seek(Duration(seconds: targetSeconds));
+                              }
+                            }
+                          });
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.last_page, size: 50),
+                        onPressed: () {
+                          setState(() {
+                            if (playing) {
+                              player.seek(musicLength);
+                            }
+                          });
+                        },
+                      ),
+                    ],
+                  )
+                ],
+              );
+            }),
       ],
     );
   }
@@ -207,6 +287,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
   @override
   void dispose() {
     tabController.dispose();
+    player.dispose();
     super.dispose();
   }
 
@@ -479,13 +560,18 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
       // Start playing it!
       playingMediaFile = mediaFile;
       setState(() {
-        String _time =
-            "${musicLength.inHours.toString().length <= 1 ? "0${musicLength.inHours}" : "${musicLength.inHours}"}:${musicLength.inMinutes.remainder(60).toString().length <= 1 ? "0${musicLength.inMinutes.remainder(60)}" : "${musicLength.inMinutes.remainder(60)}"}:${musicLength.inSeconds.remainder(60).toString().length <= 1 ? "0${musicLength.inSeconds.remainder(60)}" : "${musicLength.inSeconds.remainder(60)}"}";
-        statusText = "playing: ${playingMediaFile.fileName} ($_time)";
+        statusText = "playing: ${playingMediaFile.fileName} (${MediaFile.timeFormat(time: musicLength)})";
       });
       await player.setFilePath(playingMediaFile.fileName).then((duration) {
         playing = true;
         musicLength = duration ?? const Duration(seconds: 0);
+//        player.sequenceStateStream.listen((SequenceState? sequenceState) {
+//          print("JCREYF sequence state: ${sequenceState?.currentSource.toString()}");
+//        });
+        // Jump to wherever we stopped listening last time:
+        if (playingMediaFile.lastListenedSecond > 0) {
+          player.seek(Duration(seconds: playingMediaFile.lastListenedSecond));
+        }
         player.play();
       });
     }

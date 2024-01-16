@@ -4,12 +4,17 @@ import 'package:path/path.dart';
 class MediaFile {
   String _fileName = "";
   String _fileLocation = "";
-  String _duration = "00:00:00";
+  Duration _duration = Duration();
   int _lengthInSeconds = 0;
   int _lastListenedSecond = 0;
 
   MediaFile({required String filename}) {
     _fileName = filename;
+  }
+
+  /// Get the time duration in a human readable format: HH:MM:SS
+  static String timeFormat({required Duration time}) {
+    return "${time.inHours.toString().length <= 1 ? "0${time.inHours}" : "${time.inHours}"}:${time.inMinutes.remainder(60).toString().length <= 1 ? "0${time.inMinutes.remainder(60)}" : "${time.inMinutes.remainder(60)}"}:${time.inSeconds.remainder(60).toString().length <= 1 ? "0${time.inSeconds.remainder(60)}" : "${time.inSeconds.remainder(60)}"}";
   }
 
   @override
@@ -69,7 +74,6 @@ class MediaFile {
   }
 
   String get duration {
-    return "00:00:00";
-//    return "${musicLength.inHours.toString().length <= 1 ? "0${musicLength.inHours}" : "${musicLength.inHours}"}:${musicLength.inMinutes.remainder(60).toString().length <= 1 ? "0${musicLength.inMinutes.remainder(60)}" : "${musicLength.inMinutes.remainder(60)}"}:${musicLength.inSeconds.remainder(60).toString().length <= 1 ? "0${musicLength.inSeconds.remainder(60)}" : "${musicLength.inSeconds.remainder(60)}"}");
+    return "${_duration.inHours.toString().length <= 1 ? "0${_duration.inHours}" : "${_duration.inHours}"}:${_duration.inMinutes.remainder(60).toString().length <= 1 ? "0${_duration.inMinutes.remainder(60)}" : "${_duration.inMinutes.remainder(60)}"}:${_duration.inSeconds.remainder(60).toString().length <= 1 ? "0${_duration.inSeconds.remainder(60)}" : "${_duration.inSeconds.remainder(60)}"}";
   }
 }
