@@ -562,7 +562,9 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
       setState(() {
         statusText = "playing: ${playingMediaFile.fileName} (${MediaFile.timeFormat(time: musicLength)})";
       });
-      await player.setFilePath(playingMediaFile.fileName).then((duration) {
+
+      final playList = ConcatenatingAudioSource(children: [AudioSource.uri(Uri.parse(playingMediaFile.fileName), tag: MediaItem(id: "0", title: playingMediaFile.baseFileName, artist: "unknown artist"))]);
+      await player.setAudioSource(playList).then((duration) {
         playing = true;
         musicLength = duration ?? const Duration(seconds: 0);
 //        player.sequenceStateStream.listen((SequenceState? sequenceState) {
@@ -574,6 +576,23 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
         }
         player.play();
       });
+
+// JCREYF - The below stopped working since we moved to background player service
+//          since it needs a MediaItem instance for the playing media file.  Maybe
+//          can also set that through the code below somehow!?
+//
+//       await player.setFilePath(playingMediaFile.fileName).then((duration) {
+//         playing = true;
+//         musicLength = duration ?? const Duration(seconds: 0);
+// //        player.sequenceStateStream.listen((SequenceState? sequenceState) {
+// //          print("JCREYF sequence state: ${sequenceState?.currentSource.toString()}");
+// //        });
+//         // Jump to wherever we stopped listening last time:
+//         if (playingMediaFile.lastListenedSecond > 0) {
+//           player.seek(Duration(seconds: playingMediaFile.lastListenedSecond));
+//         }
+//         player.play();
+//       });
     }
   }
 
