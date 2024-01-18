@@ -4,7 +4,7 @@ import 'package:path/path.dart';
 class MediaFile {
   String _fileName = "";
   String _fileLocation = "";
-  Duration _duration = Duration();
+  Duration _duration = Duration.zero;
   int _lengthInSeconds = 0;
   int _lastListenedSecond = 0;
 
@@ -13,8 +13,9 @@ class MediaFile {
   }
 
   /// Get the time duration in a human readable format: HH:MM:SS
-  static String timeFormat({required Duration time}) {
-    return "${time.inHours.toString().length <= 1 ? "0${time.inHours}" : "${time.inHours}"}:${time.inMinutes.remainder(60).toString().length <= 1 ? "0${time.inMinutes.remainder(60)}" : "${time.inMinutes.remainder(60)}"}:${time.inSeconds.remainder(60).toString().length <= 1 ? "0${time.inSeconds.remainder(60)}" : "${time.inSeconds.remainder(60)}"}";
+  static String formatTime({required Duration time}) {
+//    return "${time.inHours.toString().length <= 1 ? "0${time.inHours}" : "${time.inHours}"}:${time.inMinutes.remainder(60).toString().length <= 1 ? "0${time.inMinutes.remainder(60)}" : "${time.inMinutes.remainder(60)}"}:${time.inSeconds.remainder(60).toString().length <= 1 ? "0${time.inSeconds.remainder(60)}" : "${time.inSeconds.remainder(60)}"}";
+    return time.toString().split('.')[0].padLeft(8, '0');
   }
 
   @override
@@ -73,7 +74,13 @@ class MediaFile {
     return _lengthInSeconds;
   }
 
-  String get duration {
-    return "${_duration.inHours.toString().length <= 1 ? "0${_duration.inHours}" : "${_duration.inHours}"}:${_duration.inMinutes.remainder(60).toString().length <= 1 ? "0${_duration.inMinutes.remainder(60)}" : "${_duration.inMinutes.remainder(60)}"}:${_duration.inSeconds.remainder(60).toString().length <= 1 ? "0${_duration.inSeconds.remainder(60)}" : "${_duration.inSeconds.remainder(60)}"}";
+  set duration(Duration value) {
+    _duration = value;
+    print("$_fileName - $_duration");
+  }
+
+  Duration get duration {
+//    return "${_duration.inHours.toString().length <= 1 ? "0${_duration.inHours}" : "${_duration.inHours}"}:${_duration.inMinutes.remainder(60).toString().length <= 1 ? "0${_duration.inMinutes.remainder(60)}" : "${_duration.inMinutes.remainder(60)}"}:${_duration.inSeconds.remainder(60).toString().length <= 1 ? "0${_duration.inSeconds.remainder(60)}" : "${_duration.inSeconds.remainder(60)}"}";
+    return _duration;
   }
 }

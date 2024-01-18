@@ -33,6 +33,8 @@ import 'package:flutter_phoenix/flutter_phoenix.dart';
 import 'package:filesystem_picker/filesystem_picker.dart';
 // Used to play audio:
 //   https://pub.dev/packages/just_audio/install
+//   https://github.com/ryanheise/just_audio
+//   https://github.com/ryanheise/just_audio/tree/minor/just_audio
 //   /> flutter pub add just_audio
 import 'package:just_audio/just_audio.dart';
 // Used for playing media in the background:
@@ -118,8 +120,8 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
   bool playing = false;
   MediaFile playingMediaFile = MediaFile(filename: "");
   late AudioPlayer player;
-  Duration position = const Duration(seconds: 0);
-  Duration musicLength = const Duration(seconds: 0);
+  Duration position = Duration.zero;
+  Duration musicLength = Duration.zero;
 
   Widget slider() {
     return Column(
@@ -142,6 +144,10 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
             stream: player.positionStream,
             builder: (context, snapshot) {
               final Duration positionData = snapshot.data ?? const Duration();
+//              Stream<PlayerState> state = player.playerStateStream;
+//            if state.loading or state.buffering -> show CircularProgressIndicator
+//            if state.playing -> show the pauze button
+//            if state.completed -> show replay button
               // Save the current timestamp every 30 seconds:
               if (positionData.inSeconds % 30 == 0) {
                 playingMediaFile.lastListenedSecond = positionData.inSeconds;
@@ -153,12 +159,12 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: <Widget>[
                       Text(
-                        MediaFile.timeFormat(time: positionData ?? const Duration()),
+                        MediaFile.formatTime(time: positionData),
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 25),
                       ),
                       Text(
-                        MediaFile.timeFormat(time: musicLength),
+                        MediaFile.formatTime(time: musicLength),
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 25),
                       ),
@@ -182,10 +188,9 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
                         min: 0.0,
                         max: musicLength.inSeconds.toDouble(),
                         divisions: 1 + musicLength.inSeconds,
-                        value: positionData?.inSeconds.toDouble() ?? 0.0,
+                        value: positionData.inSeconds.toDouble(),
                         onChanged: (double moveToSec) {
                           setState(() {
-                            print("slide value 2: $moveToSec");
                             seekToSec(moveToSec.toInt());
                           });
                         },
@@ -281,7 +286,31 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
     loadSettings();
 
     player = AudioPlayer();
-    // cache = AudioCache(fixedPlayer: player);
+
+    player.durationStream.listen((duration) {
+      print("DurationChangeListener: duration -> ${duration}");
+    });
+
+    player.playerStateStream.listen((state) {
+      print("PlayerStateListener: status -> ${state.toString()}");
+      playing = state.playing;
+    });
+
+    player.playbackEventStream.listen((event) {
+      print("PlaybackEventListener: status -> ${event.toString()}");
+    });
+
+    player.positionStream.listen((position) {
+      print("PositionListener: position -> ${position.toString()}");
+    });
+
+    player.currentIndexStream.listen((index) {
+      print("CurrentIndexStream: index -> $index");
+    });
+
+    player.sequenceStateStream.listen((sequenceState) {
+      print("SequenceStateStream: state -> $sequenceState");
+    });
   }
 
   @override
@@ -393,9 +422,14 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
             statusText = "Directory: $mediaDirectory";
           });
         }));
-    for (final file in files) {
-      print("media file: ${file.baseFileName}");
-    }
+//    // Loop through all the found files to fetch media details:
+//    AudioPlayer mediaFile = AudioPlayer();
+//    for (final file in files) {
+//      print("media file: ${file.baseFileName}");
+//      await mediaFile.setFilePath(file.fileName).then((duration) {
+//        file.duration = duration ?? Duration.zero;
+//      });
+//    }
   }
 
   /// Process a menu selection.
@@ -560,13 +594,24 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
       // Start playing it!
       playingMediaFile = mediaFile;
       setState(() {
-        statusText = "playing: ${playingMediaFile.fileName} (${MediaFile.timeFormat(time: musicLength)})";
+        statusText = "playing: ${playingMediaFile.fileName} (${MediaFile.formatTime(time: musicLength)})";
       });
 
-      final playList = ConcatenatingAudioSource(children: [AudioSource.uri(Uri.parse(playingMediaFile.fileName), tag: MediaItem(id: "0", title: playingMediaFile.baseFileName, artist: "unknown artist"))]);
+      final playList = ConcatenatingAudioSource(children: [
+        AudioSource.uri(Uri.parse(playingMediaFile.fileName),
+            tag: MediaItem(
+                id: "0",
+                title: playingMediaFile.baseFileName,
+                artist: "Mediatheque",
+                album: "album",
+                displayDescription: "description",
+//              displaySubtitle: "subtitle",
+//              displayTitle: "title",
+                duration: musicLength))
+      ]);
       await player.setAudioSource(playList).then((duration) {
         playing = true;
-        musicLength = duration ?? const Duration(seconds: 0);
+        musicLength = duration ?? Duration.zero;
 //        player.sequenceStateStream.listen((SequenceState? sequenceState) {
 //          print("JCREYF sequence state: ${sequenceState?.currentSource.toString()}");
 //        });
@@ -625,7 +670,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
           ],
         ),
         actions: <Widget>[
-          IconButton(icon: Icon(Icons.refresh), onPressed: () => refreshList()),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: () => refreshList()),
           PopupMenuButton<String>(
             onSelected: menuAction,
             itemBuilder: (BuildContext context) {
