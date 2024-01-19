@@ -39,7 +39,6 @@ import 'package:filesystem_picker/filesystem_picker.dart';
 import 'package:just_audio/just_audio.dart';
 // Used for playing media in the background:
 import 'package:just_audio_background/just_audio_background.dart';
-//import 'package:audio_session/audio_session.dart';
 
 // Start point of the app.
 // This needs to be a future / async method to support it running in the background
@@ -175,6 +174,8 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
                     data: SliderTheme.of(widget.context).copyWith(
                       activeTrackColor: Colors.blue[950],
                       inactiveTrackColor: Colors.grey[500],
+                      disabledInactiveTickMarkColor: Colors.grey[400],
+                      disabledThumbColor: Colors.grey[400],
                       trackShape: const RectangularSliderTrackShape(),
                       trackHeight: 20.0,
                       thumbColor: Colors.blue[900],
@@ -189,11 +190,13 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
                         max: musicLength.inSeconds.toDouble(),
                         divisions: 1 + musicLength.inSeconds,
                         value: positionData.inSeconds.toDouble(),
-                        onChanged: (double moveToSec) {
-                          setState(() {
-                            seekToSec(moveToSec.toInt());
-                          });
-                        },
+                        onChanged: playingMediaFile.fileName == ""
+                            ? null
+                            : (double moveToSec) {
+                                setState(() {
+                                  seekToSec(moveToSec.toInt());
+                                });
+                              },
                       ),
                     ),
                   ),
@@ -203,69 +206,107 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
                     children: <Widget>[
                       IconButton(
                         icon: const Icon(Icons.first_page, size: 50),
-                        onPressed: () {
-                          setState(() {
-                            if (playing) {
-                              player.seek(Duration.zero);
-                            }
-                          });
-                        },
+                        onPressed: playingMediaFile.fileName == ""
+                            ? null
+                            : () {
+                                setState(() {
+                                  if (positionData.inSeconds > 0) {
+                                    statusText = "Jump back to the beginning";
+                                    player.seek(Duration.zero);
+                                  }
+                                });
+                              },
                       ),
                       IconButton(
                         icon: const Icon(Icons.replay_30, size: 50),
-                        onPressed: () {
-                          setState(() {
-                            if (playing) {
-                              int currentSeconds = positionData.inSeconds;
-                              if (currentSeconds > 30) {
-                                player.seek(Duration(seconds: currentSeconds - 30));
-                              } else {
-                                player.seek(Duration.zero);
-                              }
-                            }
-                          });
-                        },
+                        onPressed: playingMediaFile.fileName == ""
+                            ? null
+                            : () {
+                                setState(() {
+                                  statusText = "Rewind 30 seconds";
+                                  int currentSeconds = positionData.inSeconds;
+                                  if (currentSeconds > 30) {
+                                    player.seek(Duration(seconds: currentSeconds - 30));
+                                  } else {
+                                    player.seek(Duration.zero);
+                                  }
+                                });
+                              },
                       ),
                       IconButton(
-                        icon: playingMediaFile.fileName != "" && playing ? const Icon(Icons.pause, size: 70) : const Icon(Icons.play_arrow, size: 70),
-                        onPressed: () {
-                          setState(() {
-                            if (playing) {
-                              player.stop();
-                            } else {
-                              player.play();
-                            }
-                            playing = !playing;
-                          });
-                        },
+                        icon: playingMediaFile.fileName != "" && playing
+                            ? const Icon(Icons.pause, size: 70)
+                            : positionData.inSeconds > 0 && positionData.inSeconds == musicLength.inSeconds
+                                // Both duration objects are typically off by mili- or microseconds, so need
+                                // to compare at a lower resolution:
+                                ? const Icon(Icons.restart_alt, size: 70)
+                                : const Icon(Icons.play_arrow, size: 70),
+                        onPressed: playingMediaFile.fileName == ""
+                            ? null
+                            : () {
+                                setState(() {
+                                  if (playing) {
+                                    player.stop();
+                                  } else {
+                                    // Both duration objects are typically off by mili- or microseconds, so need
+                                    // to compare at a lower resolution:
+                                    if (positionData.inSeconds == musicLength.inSeconds) {
+                                      statusText = "Restart audio";
+                                      player.seek(Duration.zero);
+                                      player.play();
+                                    } else {
+                                      statusText = "Continue playing";
+                                      player.play();
+                                    }
+                                  }
+                                  playing = !playing;
+                                });
+                              },
                       ),
                       IconButton(
                         icon: const Icon(Icons.forward_30, size: 50),
-                        onPressed: () {
-                          setState(() {
-                            if (playing) {
-                              int currentSeconds = positionData.inSeconds;
-                              int targetSeconds = currentSeconds + 30;
-                              int totalSeconds = musicLength.inSeconds;
-                              if (targetSeconds < totalSeconds) {
-                                player.seek(Duration(seconds: targetSeconds));
-                              }
-                            }
-                          });
-                        },
+                        onPressed: playingMediaFile.fileName == ""
+                            ? null
+                            : () {
+                                setState(() {
+                                  statusText = "Forward 30 seconds";
+                                  int currentSeconds = positionData.inSeconds;
+                                  int targetSeconds = currentSeconds + 30;
+                                  int totalSeconds = musicLength.inSeconds;
+                                  if (targetSeconds < totalSeconds) {
+                                    player.seek(Duration(seconds: targetSeconds));
+                                  }
+                                });
+                              },
                       ),
                       IconButton(
                         icon: const Icon(Icons.last_page, size: 50),
-                        onPressed: () {
-                          setState(() {
-                            if (playing) {
-                              player.seek(musicLength);
-                            }
-                          });
-                        },
+                        onPressed: playingMediaFile.fileName == ""
+                            ? null
+                            : () {
+                                setState(() {
+                                  statusText = "Jump to the end";
+                                  player.seek(musicLength);
+                                });
+                              },
                       ),
                     ],
-                  )
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 200),
+                      IconButton(
+                          icon: const Icon(Icons.delete_forever, size: 50),
+                          onPressed: !playingMediaFile.playedToTheEnd
+                              ? null
+                              : () {
+                                  setState(() {
+                                    statusText = "Delete ${playingMediaFile.baseFileName}";
+                                  });
+                                }),
+                    ],
+                  ),
                 ],
               );
             }),
@@ -294,6 +335,10 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
     player.playerStateStream.listen((state) {
       print("PlayerStateListener: status -> ${state.toString()}");
       playing = state.playing;
+      if (state.processingState == ProcessingState.completed) {
+        playingMediaFile.playedToTheEnd = true;
+        player.stop();
+      }
     });
 
     player.playbackEventStream.listen((event) {
@@ -670,7 +715,8 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
           ],
         ),
         actions: <Widget>[
-          IconButton(icon: const Icon(Icons.refresh), onPressed: () => refreshList()),
+          // Disable the refresh button if the player is running.  We can't have multiple players (the file listing is using a player to figure out the file's duration)
+          IconButton(icon: const Icon(Icons.refresh), onPressed: playing ? null : () => refreshList()),
           PopupMenuButton<String>(
             onSelected: menuAction,
             itemBuilder: (BuildContext context) {
@@ -721,7 +767,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
                                 child: Padding(
                                     padding: const EdgeInsets.all(10),
                                     child: Text(
-                                      song.baseFileName,
+                                      "${song.baseFileName} (${song.getDurationString()})",
                                       style: const TextStyle(fontSize: 18),
                                     ))),
                             onTap: () => clickedFile(song),

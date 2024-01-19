@@ -62,7 +62,10 @@ android {
         applicationId "com.jocreyf.mediatheque"
         // You can update the following values to match your application needs.
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
-        minSdkVersion flutter.minSdkVersion
+        // Default setting:
+        //   minSdkVersion flutter.minSdkVersion
+        // Value overridden through ./android/local.properties
+        minSdkVersion localProperties.getProperty('flutter.minSdkVersion').toInteger()
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName

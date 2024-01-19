@@ -21,6 +21,7 @@ dependencies:
   logger: ^2.0.2+1
   just_audio: ^0.9.36
   just_audio_background: ^0.0.1-beta.11
+  audio_service: ^0.18.12
 
 dev_dependencies:
   flutter_test:

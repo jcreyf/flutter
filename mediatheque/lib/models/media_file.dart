@@ -5,10 +5,10 @@ class MediaFile {
   String _fileName = "";
   String _fileLocation = "";
   Duration _duration = Duration.zero;
-  int _lengthInSeconds = 0;
   int _lastListenedSecond = 0;
+  bool _playedToTheEnd = false;
 
-  MediaFile({required String filename}) {
+  MediaFile({required String filename, Duration length = Duration.zero}) {
     _fileName = filename;
   }
 
@@ -20,7 +20,7 @@ class MediaFile {
 
   @override
   String toString() {
-    return '$_fileName ($_lengthInSeconds seconds)';
+    return _fileName;
   }
 
   String get fileName {
@@ -70,17 +70,31 @@ class MediaFile {
     _lastListenedSecond = 0;
   }
 
-  int get mediaNumberOfSeconds {
-    return _lengthInSeconds;
-  }
-
+  /// Keep track of how long the audio is in this file.
   set duration(Duration value) {
     _duration = value;
-    print("$_fileName - $_duration");
+//    print("$_fileName - $_duration");
   }
 
+  /// Return the length of the audio in the file.
   Duration get duration {
 //    return "${_duration.inHours.toString().length <= 1 ? "0${_duration.inHours}" : "${_duration.inHours}"}:${_duration.inMinutes.remainder(60).toString().length <= 1 ? "0${_duration.inMinutes.remainder(60)}" : "${_duration.inMinutes.remainder(60)}"}:${_duration.inSeconds.remainder(60).toString().length <= 1 ? "0${_duration.inSeconds.remainder(60)}" : "${_duration.inSeconds.remainder(60)}"}";
     return _duration;
+  }
+
+  String getDurationString() {
+    return MediaFile.formatTime(time: _duration);
+  }
+
+  /// Mark the file as completely listened to.
+  /// We use this flag mostly for podcasts to determine that we already listenend to this and the file can be removed.
+  set playedToTheEnd(bool flag) {
+    _playedToTheEnd = flag;
+  }
+
+  /// Determine if the we listened all the way to the end of this file.
+  /// We use this flag mostly for podcasts to determine that we already listenend to this and the file can be removed.
+  bool get playedToTheEnd {
+    return _playedToTheEnd;
   }
 }
