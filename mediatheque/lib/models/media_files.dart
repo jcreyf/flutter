@@ -62,6 +62,9 @@ class MediaFiles {
     },
         // should also register onError
         onDone: () async {
+      // Loop through the media files and figure out how long each file is.
+// ToDo: this needs to be done async in the background
+// ToDo: this is throwing an error if done while the app is playing audio.  Need to look into using a separate audio handler for this in the background
       for (MediaFile mediaFile in _mediaFiles) {
         print("Do: $mediaFile");
         final playList = ConcatenatingAudioSource(children: [AudioSource.uri(Uri.parse(mediaFile.fileName), tag: MediaItem(id: "0", title: mediaFile.baseFileName, artist: "Mediatheque", album: "album", displayDescription: "description", duration: Duration.zero))]);

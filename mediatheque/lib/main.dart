@@ -716,6 +716,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
         ),
         actions: <Widget>[
           // Disable the refresh button if the player is running.  We can't have multiple players (the file listing is using a player to figure out the file's duration)
+          // ToDo: the disable is not working!!!  Actually look into using multiple players to solve this issue!
           IconButton(icon: const Icon(Icons.refresh), onPressed: playing ? null : () => refreshList()),
           PopupMenuButton<String>(
             onSelected: menuAction,
