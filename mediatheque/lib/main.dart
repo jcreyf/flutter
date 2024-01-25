@@ -7,18 +7,19 @@
 
 */
 
+import 'package:mediatheque/constants/application_constants.dart';
 import 'package:mediatheque/models/application_setting.dart';
-import 'package:mediatheque/repositories/mediatheque_setting.dart';
+import 'package:mediatheque/repositories/application_setting_table.dart';
 import 'package:mediatheque/models/media_files.dart';
 import 'package:mediatheque/models/media_file.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:external_path/external_path.dart';
-import 'package:path/path.dart';
 // Logging stuff:
 //   https://pub.dev/packages/logger
 //   /> flutter pub add logger
 import 'package:logger/logger.dart';
+import 'package:mediatheque/repositories/media_file_table.dart';
 //   https://pub.dev/packages/permission_handler
 //   https://github.com/baseflow/flutter-permission-handler
 //   /> flutter pub add permission_handler
@@ -56,16 +57,6 @@ Future<void> main() async {
       Phoenix(
     child: MediathequeApp(),
   ));
-}
-
-//-------------
-
-class Menu {
-  static const String SetDirectory = 'Change directory';
-  static const String ChangeTheme = 'Toggle Theme';
-  static const String Refresh = 'Refresh files';
-  static const String Exit = 'Exit';
-  static const List<String> menuItems = <String>[SetDirectory, ChangeTheme, Refresh, Exit];
 }
 
 //-------------
@@ -108,7 +99,7 @@ class MediathequeHomePage extends StatefulWidget {
 
 class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerProviderStateMixin {
   final Logger logger = Logger();
-  final settingsDatabase = SettingsDatabase();
+  final settingsTable = SettingsTable();
   MediaFiles _mediaFiles = MediaFiles();
   late TabController tabController;
   List<String> tabNames = ["Media", "Player", "Logs"];
@@ -117,7 +108,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
   String mediaDirectory = "";
 
   bool playing = false;
-  MediaFile playingMediaFile = MediaFile(filename: "");
+  MediaFile playingMediaFile = MediaFile(fileName: "");
   late AudioPlayer player;
   Duration position = Duration.zero;
   Duration musicLength = Duration.zero;
@@ -329,14 +320,16 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
     player = AudioPlayer();
 
     player.durationStream.listen((duration) {
-      print("DurationChangeListener: duration -> ${duration}");
+      print("DurationChangeListener: duration -> $duration");
     });
 
+    // Listen for state changes in the media player (player started, stopped, paused, reached the end).
     player.playerStateStream.listen((state) {
-      print("PlayerStateListener: status -> ${state.toString()}");
+//      print("PlayerStateListener: status -> ${state.toString()}");
       playing = state.playing;
       if (state.processingState == ProcessingState.completed) {
         playingMediaFile.playedToTheEnd = true;
+        playingMediaFile.savePlayedToEnd();
         player.stop();
       }
     });
@@ -345,8 +338,14 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
       print("PlaybackEventListener: status -> ${event.toString()}");
     });
 
-    player.positionStream.listen((position) {
-      print("PositionListener: position -> ${position.toString()}");
+    // Listen to playback position changes as the media is playing:
+    player.positionStream.listen((Duration playbackPosition) {
+      // Save the current position every 30 seconds in the backend database.
+      // This becomes the snapshot from which we can start again if playback was stopped for whatever reason.
+      if (playbackPosition.inSeconds % 30 == 0) {
+        playingMediaFile.savePlaybackLocation(seconds: playbackPosition.inSeconds);
+      }
+//      print("PositionListener: position -> ${playbackPosition.toString()}");
     });
 
     player.currentIndexStream.listen((index) {
@@ -369,7 +368,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
   void loadSettings() {
     // Read all setting records asynchronously, then loop through them:
     print("Read settings...");
-    settingsDatabase.fetchAll().then((settings) {
+    settingsTable.fetchAll().then((settings) {
       print("Settings read!");
       print(settings);
       for (var setting in settings) {
@@ -459,14 +458,18 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
 
   /// Update the list of supported media files
   void refreshList() async {
-    List<MediaFile> files = await _mediaFiles.buildList(
-        directory: mediaDirectory,
-        callback: (() {
-          setState(() {
-            // Update the UI
-            statusText = "Directory: $mediaDirectory";
-          });
-        }));
+    await _mediaFiles
+        .buildList(
+            directory: mediaDirectory,
+            callback: (() {
+              setState(() {
+                // Update the UI
+                statusText = "Directory: $mediaDirectory";
+              });
+            }))
+        .then((mediaFiles) {
+      print("Done generating MediaFile list: $mediaFiles");
+    });
 //    // Loop through all the found files to fetch media details:
 //    AudioPlayer mediaFile = AudioPlayer();
 //    for (final file in files) {
@@ -475,30 +478,44 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
 //        file.duration = duration ?? Duration.zero;
 //      });
 //    }
+
+    print("List database records:");
+    MediaFileTable table = MediaFileTable();
+    await table.fetchAll().then((mediaFiles) {
+      for (final mediaFile in mediaFiles) {
+        print("DB Record: $mediaFile");
+      }
+    });
   }
 
   /// Process a menu selection.
   void menuAction(String menuItem) {
     print("Menu: $menuItem");
     switch (menuItem) {
-      case (Menu.SetDirectory):
+      case (MenuConstants.setDirectory):
         showDirectorySelector(((newDirName) {
           // A new directory was selected.  Save in the settings and get a new file list:
           setState(() {
             mediaDirectory = newDirName;
             statusText = "New dir: $newDirName";
-            settingsDatabase.insertOrUpdate(type: "setting", key: "media_directory", value: newDirName);
+            settingsTable.insertOrUpdate(type: "setting", key: "media_directory", value: newDirName);
             refreshList();
           });
         }));
         break;
-      case (Menu.ChangeTheme):
+      case (MenuConstants.changeTheme):
         changeTheme();
         break;
-      case (Menu.Refresh):
+      case (MenuConstants.refresh):
         refreshList();
         break;
-      case (Menu.Exit):
+      case (MenuConstants.clearCache):
+        setState(() {
+          statusText = "Clearing the cache";
+          MediaFiles().clearCache();
+        });
+        break;
+      case (MenuConstants.exit):
         exit(0);
     }
   }
@@ -536,7 +553,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
         break;
     }
     statusText = "Switching to $themeName theme";
-    settingsDatabase.insertOrUpdate(type: "setting", key: "theme", value: themeName);
+    settingsTable.insertOrUpdate(type: "setting", key: "theme", value: themeName);
   }
 
   void onTabChange() {
@@ -630,20 +647,21 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
       // Stop the player!
       await player.stop();
       playing = false;
-      playingMediaFile = MediaFile(filename: "");
+      playingMediaFile = MediaFile(fileName: "");
       setState(() {
         statusText = "stop playing: ${mediaFile.fileName}";
       });
     } else {
       // The user clicked on a file.
       // Start playing it!
+      await mediaFile.getPlaytimeData();
       playingMediaFile = mediaFile;
       setState(() {
-        statusText = "playing: ${playingMediaFile.fileName} (${MediaFile.formatTime(time: musicLength)})";
+        statusText = "playing: ${playingMediaFile.fileName} (${playingMediaFile.getDurationString()})${playingMediaFile.lastListenedSecond}";
       });
 
       final playList = ConcatenatingAudioSource(children: [
-        AudioSource.uri(Uri.parse(playingMediaFile.fileName),
+        AudioSource.uri(Uri.parse(playingMediaFile.fileFullPath),
             tag: MediaItem(
                 id: "0",
                 title: playingMediaFile.baseFileName,
@@ -721,7 +739,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
           PopupMenuButton<String>(
             onSelected: menuAction,
             itemBuilder: (BuildContext context) {
-              return Menu.menuItems.map((String menuItem) {
+              return MenuConstants.menuItems.map((String menuItem) {
                 return PopupMenuItem<String>(
                   value: menuItem,
                   child: Row(

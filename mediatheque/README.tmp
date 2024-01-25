@@ -1,0 +1,29 @@
+Android SDK: /tools/Android/Sdk
+Android emulator (Pixel 6 API 33): /home/jcreyf/.android/avd/Pixel_6_API_33.avd/
+Namespace: com.jocreyf.mediatheque
+
+jcreyfl1:/tools/Android/Sdk/
+
+/> adb devices
+List of devices attached
+emulator-5554   device
+
+/> adb -s emulator-5554 shell
+
+emu64xa:/ $ run-as com.jocreyf.mediatheque
+
+emu64xa:/data/user/0/com.jocreyf.mediatheque $ cd databases
+
+emu64xa:/data/user/0/com.jocreyf.mediatheque/databases $ sqlite3 mediatheque.db
+
+sqlite> .help
+
+sqlite> .tables
+android_metadata  media_files       settings
+
+sqlite> select * from settings;
+setting|theme|light|1705984344|1705984344802
+setting|media_directory|/storage/emulated/0/|1705984355|1705984355225
+
+sqlite>.quit
+
