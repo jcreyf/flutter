@@ -12,6 +12,7 @@ import 'package:mediatheque/models/application_setting.dart';
 import 'package:mediatheque/repositories/application_setting_table.dart';
 import 'package:mediatheque/models/media_files.dart';
 import 'package:mediatheque/models/media_file.dart';
+import 'package:mediatheque/ui/logs.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:external_path/external_path.dart';
@@ -63,10 +64,12 @@ Future<void> main() async {
 
 class MediathequeApp extends StatelessWidget {
   final title = "Mediatheque";
+  final appLogger = AppLogging();
 
   /// Constructor
   MediathequeApp() {
     super.key;
+    appLogger.addLine("Starting app");
   }
 
   /// This widget is the root of the application.
@@ -79,7 +82,7 @@ class MediathequeApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: MediathequeHomePage(title: title, context: context),
+      home: MediathequeHomePage(title: title, appLogger: appLogger, context: context),
     );
   }
 }
@@ -87,8 +90,9 @@ class MediathequeApp extends StatelessWidget {
 //-------------
 
 class MediathequeHomePage extends StatefulWidget {
-  const MediathequeHomePage({super.key, required this.title, required this.context});
+  const MediathequeHomePage({super.key, required this.title, required this.appLogger, required this.context});
   final String title;
+  final AppLogging appLogger;
   final BuildContext context;
 
   @override
@@ -320,12 +324,12 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
     player = AudioPlayer();
 
     player.durationStream.listen((duration) {
-      print("DurationChangeListener: duration -> $duration");
+      widget.appLogger.addLine("DurationChangeListener: duration -> $duration");
     });
 
     // Listen for state changes in the media player (player started, stopped, paused, reached the end).
     player.playerStateStream.listen((state) {
-//      print("PlayerStateListener: status -> ${state.toString()}");
+//      widget.appLogger.addLine("PlayerStateListener: status -> ${state.toString()}");
       playing = state.playing;
       if (state.processingState == ProcessingState.completed) {
         playingMediaFile.playedToTheEnd = true;
@@ -335,7 +339,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
     });
 
     player.playbackEventStream.listen((event) {
-      print("PlaybackEventListener: status -> ${event.toString()}");
+      widget.appLogger.addLine("PlaybackEventListener: status -> ${event.toString()}");
     });
 
     // Listen to playback position changes as the media is playing:
@@ -345,15 +349,15 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
       if (playbackPosition.inSeconds % 30 == 0) {
         playingMediaFile.savePlaybackLocation(seconds: playbackPosition.inSeconds);
       }
-//      print("PositionListener: position -> ${playbackPosition.toString()}");
+//      widget.appLogger.addLine("PositionListener: position -> ${playbackPosition.toString()}");
     });
 
     player.currentIndexStream.listen((index) {
-      print("CurrentIndexStream: index -> $index");
+      widget.appLogger.addLine("CurrentIndexStream: index -> $index");
     });
 
     player.sequenceStateStream.listen((sequenceState) {
-      print("SequenceStateStream: state -> $sequenceState");
+      widget.appLogger.addLine("SequenceStateStream: state -> $sequenceState");
     });
   }
 
@@ -367,12 +371,12 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
   /// Load the settings from the backend database.
   void loadSettings() {
     // Read all setting records asynchronously, then loop through them:
-    print("Read settings...");
+    widget.appLogger.addLine("Read settings...");
     settingsTable.fetchAll().then((settings) {
-      print("Settings read!");
-      print(settings);
+      widget.appLogger.addLine("Settings read!");
+      widget.appLogger.addLine(settings.toString());
       for (var setting in settings) {
-        print("setting: ${setting.type} - ${setting.key} - ${setting.value}");
+        widget.appLogger.addLine("setting: ${setting.type} - ${setting.key} - ${setting.value}");
         switch (setting.type) {
           // Process app settings:
           case "setting":
@@ -387,7 +391,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
               // Process default tab setting:
               case "default_tab":
                 ApplicationSetting.defaultTab = setting.value;
-                statusText += "\nSelect tab: ${ApplicationSetting.defaultTab}";
+                widget.appLogger.addLine("Select tab: ${ApplicationSetting.defaultTab}");
                 break;
             }
             break;
@@ -417,7 +421,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
     // And external storage (SD card) directory path (if exists)
     paths = await ExternalPath.getExternalStorageDirectories();
     // ex: [/storage/emulated/0, /storage/B3AE-4D28]
-    print("paths: $paths");
+    widget.appLogger.addLine("paths: $paths");
     return paths;
   }
 
@@ -425,7 +429,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
   // Use below code
   Future<void> getPublicDirectoryPath() async {
     mediaDirectory = await ExternalPath.getExternalStoragePublicDirectory(ExternalPath.DIRECTORY_DOWNLOADS);
-    print("Downloads directory: $mediaDirectory");
+    widget.appLogger.addLine("Downloads directory: $mediaDirectory");
   }
 
   /// Check if we have the permission to access the filesystem.
@@ -452,7 +456,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
         openAppSettings();
       }
     } catch (e) {
-      print('~~Filesystem permission error!!~~~>>>>>> $e');
+      widget.appLogger.addLine('~~Filesystem permission error!!~~~>>>>>> $e');
     }
   }
 
@@ -468,29 +472,29 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
               });
             }))
         .then((mediaFiles) {
-      print("Done generating MediaFile list: $mediaFiles");
+      widget.appLogger.addLine("Done generating MediaFile list: $mediaFiles");
     });
 //    // Loop through all the found files to fetch media details:
 //    AudioPlayer mediaFile = AudioPlayer();
 //    for (final file in files) {
-//      print("media file: ${file.baseFileName}");
+//      widget.appLogger.addLine("media file: ${file.baseFileName}");
 //      await mediaFile.setFilePath(file.fileName).then((duration) {
 //        file.duration = duration ?? Duration.zero;
 //      });
 //    }
 
-    print("List database records:");
+    widget.appLogger.addLine("List database records:");
     MediaFileTable table = MediaFileTable();
     await table.fetchAll().then((mediaFiles) {
       for (final mediaFile in mediaFiles) {
-        print("DB Record: $mediaFile");
+        widget.appLogger.addLine("DB Record: $mediaFile");
       }
     });
   }
 
   /// Process a menu selection.
   void menuAction(String menuItem) {
-    print("Menu: $menuItem");
+    widget.appLogger.addLine("Menu: $menuItem");
     switch (menuItem) {
       case (MenuConstants.setDirectory):
         showDirectorySelector(((newDirName) {
@@ -647,7 +651,6 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
       // Stop the player!
       await player.stop();
       playing = false;
-      playingMediaFile = MediaFile(fileName: "");
       setState(() {
         statusText = "stop playing: ${mediaFile.fileName}";
       });
@@ -657,9 +660,10 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
       await mediaFile.getPlaytimeData();
       playingMediaFile = mediaFile;
       setState(() {
-        statusText = "playing: ${playingMediaFile.fileName} (${playingMediaFile.getDurationString()})${playingMediaFile.lastListenedSecond}";
+        statusText = "playing: ${playingMediaFile.fileName} (${playingMediaFile.getDurationString()})-${playingMediaFile.lastListenedSecond}";
       });
 
+      // The "just_audio_background" object needs a MediaItem instance for the file that is playing.
       final playList = ConcatenatingAudioSource(children: [
         AudioSource.uri(Uri.parse(playingMediaFile.fileFullPath),
             tag: MediaItem(
@@ -672,35 +676,19 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
 //              displayTitle: "title",
                 duration: musicLength))
       ]);
-      await player.setAudioSource(playList).then((duration) {
+      await player.setAudioSource(playList).then((duration) async {
         playing = true;
         musicLength = duration ?? Duration.zero;
-//        player.sequenceStateStream.listen((SequenceState? sequenceState) {
-//          print("JCREYF sequence state: ${sequenceState?.currentSource.toString()}");
-//        });
         // Jump to wherever we stopped listening last time:
         if (playingMediaFile.lastListenedSecond > 0) {
-          player.seek(Duration(seconds: playingMediaFile.lastListenedSecond));
+          setState(() async {
+            statusText = "Skipping to ${playingMediaFile.lastListenedSecond}";
+            await player.seek(Duration(seconds: playingMediaFile.lastListenedSecond)).then((value) => player.play());
+          });
+        } else {
+          player.play();
         }
-        player.play();
       });
-
-// JCREYF - The below stopped working since we moved to background player service
-//          since it needs a MediaItem instance for the playing media file.  Maybe
-//          can also set that through the code below somehow!?
-//
-//       await player.setFilePath(playingMediaFile.fileName).then((duration) {
-//         playing = true;
-//         musicLength = duration ?? const Duration(seconds: 0);
-// //        player.sequenceStateStream.listen((SequenceState? sequenceState) {
-// //          print("JCREYF sequence state: ${sequenceState?.currentSource.toString()}");
-// //        });
-//         // Jump to wherever we stopped listening last time:
-//         if (playingMediaFile.lastListenedSecond > 0) {
-//           player.seek(Duration(seconds: playingMediaFile.lastListenedSecond));
-//         }
-//         player.play();
-//       });
     }
   }
 
@@ -796,7 +784,7 @@ class _MediathequeHomePageState extends State<MediathequeHomePage> with TickerPr
                     : const Center(child: Text('No Files'))),
           ),
           slider(),
-          const Text("No logs"),
+          widget.appLogger.widget(),
         ],
       ),
       bottomNavigationBar: Container(

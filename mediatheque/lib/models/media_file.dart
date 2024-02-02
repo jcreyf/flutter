@@ -1,6 +1,7 @@
 import 'dart:io' as io;
 import 'package:path/path.dart';
 import 'package:mediatheque/repositories/media_file_table.dart';
+import 'package:mediatheque/ui/logs.dart';
 
 /// Closs to hold info about a single media file.
 class MediaFile {
@@ -12,6 +13,7 @@ class MediaFile {
   bool _playedToTheEnd = false;
   String? createdAt;
   String? updatedAt;
+  AppLogging? appLogger;
 
   /// Constructor (taking all fields so that we can create an instance from a JSON serialized SQLite record).
   MediaFile(
@@ -43,6 +45,10 @@ class MediaFile {
         createdAt: DateTime.fromMicrosecondsSinceEpoch(map['created_at']).toIso8601String(),
         updatedAt: map['updated_at'] == null ? null : DateTime.fromMillisecondsSinceEpoch(map['updated_at']).toIso8601String(),
       );
+
+  setAppLogger({required AppLogging? logger}) {
+    appLogger = logger;
+  }
 
   /// Get the time duration in a human readable format: HH:MM:SS
   static String formatTime({required Duration time}) {
@@ -137,7 +143,7 @@ class MediaFile {
       fileLocation: _fileLocation,
       fileSize: _fileSize,
       durationSeconds: _duration.inSeconds,
-    ).then((id) => print("inserted $id record for $fileName"));
+    ).then((id) => appLogger?.addLine("inserted $id record for $fileName"));
   }
 
   /// Update the record in the backend database to keep track of where we are in the media file.
@@ -157,7 +163,7 @@ class MediaFile {
   /// This is mostly useful to keep track of podcasts in a playlist so that we can cirle back later and remove
   /// the ones we finished listening to.
   Future<void> savePlayedToEnd() async {
-    await MediaFileTable().updateLastPlaybackLocation(
+    await MediaFileTable().updatePlayedToEnd(
       fileName: _fileName,
       fileLocation: _fileLocation,
       fileSize: _fileSize,

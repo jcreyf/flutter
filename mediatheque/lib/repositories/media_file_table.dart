@@ -68,10 +68,21 @@ class MediaFileTable {
   }
 
   /// Keep track of the last snapshot of a specific media file.
+  Future<int> updateLastPlaybackLocation({required String fileName, required String fileLocation, required int fileSize, required int lastListenedSecond}) async {
+    final database = await getDatabase();
+    return await database.update(
+      tableName,
+      {'last_listened_second': lastListenedSecond, 'updated_at': DateTime.now().millisecondsSinceEpoch},
+      where: 'file_name = ? AND file_location = ? AND file_size = ?',
+      conflictAlgorithm: ConflictAlgorithm.rollback,
+      whereArgs: [fileName, fileLocation, fileSize],
+    );
+  }
+
   /// Update the record in the backend database to keep track of which media file we finished listening to.
-  /// This is mostly useful to keep track of podcasts in a playlist so that we can cirle back later and remove
+  /// This is mostly useful to keep track of podcasts in a playlist so that we can circle back later and remove
   /// the ones we finished listening to.
-  Future<int> updateLastPlaybackLocation({required String fileName, required String fileLocation, required int fileSize, required int lastListenedSecond, bool playedToEnd = false}) async {
+  Future<int> updatePlayedToEnd({required String fileName, required String fileLocation, required int fileSize, required int lastListenedSecond, bool playedToEnd = true}) async {
     final database = await getDatabase();
     return await database.update(
       tableName,
@@ -81,17 +92,6 @@ class MediaFileTable {
       whereArgs: [fileName, fileLocation, fileSize],
     );
   }
-
-  // Future<int> updatePlayedToEnd({required String fileName, required String fileLocation, required int fileSize, required int lastListenedSecond, bool playedToEnd = true}) async {
-  //   final database = await getDatabase();
-  //   return await database.update(
-  //     tableName,
-  //     {'last_listened_second': lastListenedSecond, 'played_to_end': playedToEnd, 'updated_at': DateTime.now().millisecondsSinceEpoch},
-  //     where: 'file_name = ? AND file_location = ? AND file_size = ?',
-  //     conflictAlgorithm: ConflictAlgorithm.rollback,
-  //     whereArgs: [fileName, fileLocation, fileSize],
-  //   );
-  // }
 
   /// Insert a new record or update the values if the record already exists.
   ///   https://stackoverflow.com/questions/3634984/insert-if-not-exists-else-update
